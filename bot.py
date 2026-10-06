@@ -24,8 +24,10 @@ def init_db():
 init_db()
 
 def get_coordinates(address):
-    # 🔒 ДОБАВЛЕНО: Принудительно ищем только в Смоленске
-    query = f"{address}, Смоленск, Россия"
+    # 🔒 ЖЕСТКАЯ ПРИВЯЗКА К СМОЛЕНСКУ
+    # Бот сам добавит "г. Смоленск, " перед тем, что вы написали
+    query = f"г. Смоленск, {address}"
+    
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": query, "format": "json", "limit": 1}
     headers = {"User-Agent": "SmolenskMapBot/1.0"}
@@ -40,54 +42,47 @@ def get_coordinates(address):
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-   @bot.message_handler(func=lambda message: True)
-   def handle_message(message):
-       if message.chat.id != ADMIN_CHAT_ID:
-           return # Просто игнорируем чужих, чтобы не спамить
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        return 
 
-       # Игнорируем стикеры, фото, голосовые и пустые сообщения
-       if message.text is None:
-           return 
+    if message.text is None:
+        return 
 
-       text = message.text.strip()
+    text = message.text.strip()
     
-    # Ищем последний дефис, чтобы разделить адрес/координаты и название
     if '-' in text:
         parts = text.rsplit('-', 1) 
         location_part = parts[0].strip()
         title = parts[1].strip()
         
         if not location_part or not title:
-            bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название\nПример: Гагарина 1 - Офис")
+            bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название\nПример: Гагарина 5 - Офис")
             return
 
-        # 📍 ПРОВЕРКА: Являются ли введенные данные координатами?
-        # Ищем шаблон вроде "54.781, 32.045"
         coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
         
         if coord_match:
-            # Это координаты!
             lat = float(coord_match.group(1))
             lon = float(coord_match.group(2))
             bot.reply_to(message, f"✅ Координаты приняты!\n📍 {title}")
         else:
-            # Это адрес, ищем через геокодер (уже с привязкой к Смоленску)
             bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
             lat, lon = get_coordinates(location_part)
             
         if lat and lon:
             conn = sqlite3.connect('points.db')
             c = conn.cursor()
-            # Сохраняем в БД именно то, что ввел пользователь (location_part)
             c.execute("INSERT INTO points (title, address, lat, lon, status) VALUES (?, ?, ?, ?, 'active')",
                      (title, location_part, lat, lon))
             conn.commit()
             conn.close()
             bot.reply_to(message, f"✅ Точка '{title}' успешно добавлена на карту!")
         else:
-            bot.reply_to(message, f"❌ Не удалось найти адрес: '{location_part}'. Проверьте написание.")
+            bot.reply_to(message, f"❌ Не удалось найти адрес: '{location_part}' в Смоленске. Проверьте написание.")
     else:
-        bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название\nПримеры:\n• Гагарина 1 - Офис\n• ул. Ленина 10 - Склад\n• 54.781, 32.045 - Точка на поле")
+        bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название\nПримеры:\n• Гагарина 5 - Офис\n• ул. Ленина 10 - Склад\n• 54.781, 32.045 - Точка на поле")
 
 @app.route('/')
 def serve_website():
@@ -125,4 +120,4 @@ if __name__ == '__main__':
     bot_thread.daemon = True
     bot_thread.start()
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port) 
