@@ -7,34 +7,31 @@ from flask_cors import CORS
 import threading
 import os
 
+# ✅ ИСПРАВЛЕНО: Правильное получение токена (имя переменной окружения, затем значение по умолчанию)
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8803648566:AAHmG4XTMTDqfIHlWjBeDsKCGmQ18pxKnGQ")
 ADMIN_CHAT_ID = 7929131842
+DATABASE_URL = "postgresql://mapbotuser:r47l5ou0pDueVnus4tiD3d2w7hYQJ1vy@dpg-db4fc5ks728c73ajgig0-a.frankfurt-postgres.render.com/mapbotdb"
 
 app = Flask(__name__)
 CORS(app)
 
 def init_db():
-    try:
-        conn = sqlite3.connect('points.db')
-        c = conn.cursor()
-        
-        # Создаем таблицу точек (если нет)
-        c.execute('''CREATE TABLE IF NOT EXISTS points
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
-        
-        # ✅ УДАЛЯЕМ старую таблицу парковок и создаём заново с правильной структурой
-        c.execute("DROP TABLE IF EXISTS parkings")
-        c.execute('''CREATE TABLE parkings
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
-                      available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
-        
-        conn.commit()
-        conn.close()
-        print("✅ База данных успешно инициализирована! Таблица parkings пересоздана.")
-    except Exception as e:
-        print(f"❌ Ошибка инициализации БД: {e}")
+    conn = sqlite3.connect('points.db')
+    c = conn.cursor()
+    
+    # Таблица обычных точек (самокатов)
+    c.execute('''CREATE TABLE IF NOT EXISTS points
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
+    
+    # ✅ Таблица парковок с защитой от NULL (DEFAULT '?')
+    c.execute('''CREATE TABLE IF NOT EXISTS parkings
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
+                  available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
+    
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -62,6 +59,9 @@ def handle_message(message):
     text = message.text.strip()
     text_lower = text.lower()
 
+    # ==========================================
+    # 🗑️ 1. УДАЛИТЬ ВСЕ ПАРКОВКИ
+    # ==========================================
     if text_lower == 'все p off':
         conn = sqlite3.connect('points.db')
         c = conn.cursor()
@@ -69,12 +69,16 @@ def handle_message(message):
         count = c.rowcount
         conn.commit()
         conn.close()
-        bot.reply_to(message, f"️ Удалено всех парковок: {count}")
+        bot.reply_to(message, f"🗑️ Удалено всех парковок: {count}")
         return
 
+    # ==========================================
+    # 🗑️ 2. УДАЛИТЬ ПОСЛЕДНЮЮ ПАРКОВКУ
+    # ==========================================
     if text_lower == 'last p off':
         conn = sqlite3.connect('points.db')
         c = conn.cursor()
+        # Удаляем парковку с максимальным ID (последнюю созданную)
         c.execute("DELETE FROM parkings WHERE id = (SELECT MAX(id) FROM parkings)")
         if c.rowcount > 0:
             bot.reply_to(message, "🗑️ Последняя парковка успешно удалена.")
@@ -84,12 +88,18 @@ def handle_message(message):
         conn.close()
         return
 
+    # ==========================================
+    # 🅿️ 3. ОБНОВЛЕНИЕ ДАННЫХ ПАРКОВКИ (Д, С, П)
+    # ==========================================
     parking_match = re.match(r'^(.+?)\s+([ДдСсПп]\d+(?:\s+[ДдСсПп]\d+)*)$', text)
     if parking_match:
         title = parking_match.group(1).strip()
         params_str = parking_match.group(2)
         
-        avail = dead = broken = None
+        avail = None
+        dead = None
+        broken = None
+        
         params = re.findall(r'([ДдСсПп])(\d+)', params_str)
         for param_type, param_value in params:
             if param_type.lower() == 'д': avail = param_value
@@ -122,6 +132,9 @@ def handle_message(message):
         conn.close()
         return
 
+    # ==========================================
+    # 📍 4. СОЗДАНИЕ ОБЫЧНОЙ ТОЧКИ (САМОКАТА)
+    # ==========================================
     if '-' in text:
         parts = text.rsplit('-', 1) 
         location_part = parts[0].strip()
@@ -132,10 +145,12 @@ def handle_message(message):
             return
 
         coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
+        
         if coord_match:
-            lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
+            lat = float(coord_match.group(1))
+            lon = float(coord_match.group(2))
         else:
-            bot.reply_to(message, f" Ищу '{location_part}' в г. Смоленск...")
+            bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
             lat, lon = get_coordinates(location_part)
             
         if lat and lon:
@@ -149,7 +164,9 @@ def handle_message(message):
         else:
             bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
 
-# --- API ЭНДПОИНТЫ ---
+# ==========================================
+# 🌐 API ЭНДПОИНТЫ ДЛЯ КАРТЫ
+# ==========================================
 
 @app.route('/')
 def serve_website():
@@ -179,27 +196,30 @@ def update_status():
     conn.close()
     return jsonify({"success": True})
 
+# ✅ ЭНДПОИНТ С ЗАЩИТОЙ: отдает парковки, гарантируя наличие данных
 @app.route('/get_parkings')
 def get_parkings():
-    try:
-        conn = sqlite3.connect('points.db')
-        c = conn.cursor()
-        c.execute("SELECT id, title, address, lat, lon, available_count, dead_count, broken_count FROM parkings")
-        parkings = []
-        for row in c.fetchall():
-            if row[3] is None or row[4] is None: 
-                continue
-            parkings.append({
-                "id": row[0], "title": row[1] or "Без названия", "address": row[2] or "?", 
-                "lat": float(row[3]), "lon": float(row[4]), 
-                "available": row[5] if row[5] is not None else '?', 
-                "dead": row[6] if row[6] is not None else '?', 
-                "broken": row[7] if row[7] is not None else '?'
-            })
-        conn.close()
-        return jsonify(parkings)
-    except Exception as e:
-        return jsonify({"error": "Внутренняя ошибка сервера", "details": str(e)}), 500
+    conn = sqlite3.connect('points.db')
+    c = conn.cursor()
+    c.execute("SELECT id, title, address, lat, lon, available_count, dead_count, broken_count FROM parkings")
+    parkings = []
+    for row in c.fetchall():
+        # ✅ ЗАЩИТА ОТ БИТЫХ ДАННЫХ НА СЕРВЕРЕ
+        if row[3] is None or row[4] is None: 
+            continue # Пропускаем парковки без координат
+            
+        parkings.append({
+            "id": row[0], 
+            "title": row[1] or "Без названия", 
+            "address": row[2] or "?", 
+            "lat": float(row[3]), 
+            "lon": float(row[4]), 
+            "available": row[5] if row[5] is not None else '?', 
+            "dead": row[6] if row[6] is not None else '?', 
+            "broken": row[7] if row[7] is not None else '?'
+        })
+    conn.close()
+    return jsonify(parkings)
 
 @app.route('/update_parking', methods=['POST'])
 def update_parking():
