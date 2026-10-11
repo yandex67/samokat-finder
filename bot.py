@@ -3,7 +3,7 @@ import requests
 import psycopg
 import json
 import re
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 import threading
 import os
@@ -13,8 +13,17 @@ ADMIN_CHAT_ID = 7929131842
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://mapbotuser:r47l5ou0pDueVnus4tiD3d2w7hYQJ1vy@dpg-db4fc5ks728c73ajgig0-a.frankfurt-postgres.render.com/mapbotdb")
 
 app = Flask(__name__)
-# ✅ ЯВНАЯ НАСТРОЙКА CORS для разрешения запросов с GitHub Pages
-CORS(app, resources={r"/*": {"origins": "*"}})
+
+# 1. Базовая настройка CORS
+CORS(app)
+
+# 2. ПУЛЕНЕПРОБИВАЕМАЯ защита CORS: добавляем заголовки к КАЖДОМУ ответу (включая OPTIONS preflight)
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    return response
 
 def get_db_connection():
     return psycopg.connect(DATABASE_URL)
@@ -24,18 +33,15 @@ def init_db():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 1. Таблица обычных точек
         c.execute('''CREATE TABLE IF NOT EXISTS points
                      (id SERIAL PRIMARY KEY,
                       title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
         
-        # 2. Таблица парковок (без DROP, чтобы сохранять данные)
         c.execute('''CREATE TABLE IF NOT EXISTS parkings
                      (id SERIAL PRIMARY KEY,
                       title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
                       available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
         
-        # 3. ✅ ВОССТАНОВЛЕНО: Таблица зон
         c.execute('''CREATE TABLE IF NOT EXISTS zones
                      (id SERIAL PRIMARY KEY,
                       coords JSONB,
@@ -43,7 +49,7 @@ def init_db():
         
         conn.commit()
         conn.close()
-        print("✅ База данных успешно инициализирована! Все таблицы на месте.")
+        print("✅ База данных успешно инициализирована!")
     except Exception as e:
         print(f"❌ Ошибка инициализации БД: {e}")
 
@@ -195,7 +201,7 @@ def handle_message(message):
             bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
 
 # ==========================================
-# 🌐 API ЭНДПОИНТЫ ДЛЯ КАРТЫ
+# 🌐 API ЭНДПОИНТЫ
 # ==========================================
 
 @app.route('/')
@@ -204,27 +210,33 @@ def serve_website():
 
 @app.route('/get_points')
 def get_points():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT id, title, address, lat, lon, status FROM points WHERE status != 'found'")
-    points = [{"id": row[0], "title": row[1], "address": row[2], "lat": row[3], "lon": row[4], "status": row[5]} for row in c.fetchall()]
-    conn.close()
-    return jsonify(points)
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id, title, address, lat, lon, status FROM points WHERE status != 'found'")
+        points = [{"id": row[0], "title": row[1], "address": row[2], "lat": row[3], "lon": row[4], "status": row[5]} for row in c.fetchall()]
+        conn.close()
+        return jsonify(points)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/update_status', methods=['POST'])
 def update_status():
-    data = request.json
-    point_id = data.get('id')
-    status = data.get('status')
-    conn = get_db_connection()
-    c = conn.cursor()
-    if status == 'found':
-        c.execute("DELETE FROM points WHERE id = %s", (point_id,))
-    else:
-        c.execute("UPDATE points SET status = %s WHERE id = %s", (status, point_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+    try:
+        data = request.json
+        point_id = data.get('id')
+        status = data.get('status')
+        conn = get_db_connection()
+        c = conn.cursor()
+        if status == 'found':
+            c.execute("DELETE FROM points WHERE id = %s", (point_id,))
+        else:
+            c.execute("UPDATE points SET status = %s WHERE id = %s", (status, point_id))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/get_parkings')
 def get_parkings():
@@ -250,17 +262,19 @@ def get_parkings():
 
 @app.route('/update_parking', methods=['POST'])
 def update_parking():
-    data = request.json
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE id = %s", 
-              (data.get('available', '?'), data.get('dead', '?'), data.get('broken', '?'), data.get('id')))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+    try:
+        data = request.json
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE id = %s", 
+                  (data.get('available', '?'), data.get('dead', '?'), data.get('broken', '?'), data.get('id')))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# ✅ ВОССТАНОВЛЕНО: Эндпоинты для работы с зонами
-@app.route('/get_zones', methods=['GET'])
+@app.route('/get_zones', methods=['GET', 'OPTIONS'])
 def get_zones():
     try:
         conn = get_db_connection()
@@ -272,7 +286,7 @@ def get_zones():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/add_zone', methods=['POST'])
+@app.route('/add_zone', methods=['POST', 'OPTIONS'])
 def add_zone():
     try:
         data = request.json
@@ -280,7 +294,6 @@ def add_zone():
         comment = data.get('comment', '')
         conn = get_db_connection()
         c = conn.cursor()
-        # Сохраняем координаты как JSON
         c.execute("INSERT INTO zones (coords, comment) VALUES (%s, %s)", (json.dumps(coords), comment))
         conn.commit()
         conn.close()
@@ -288,7 +301,7 @@ def add_zone():
     except Exception as e:
         return jsonify({"error": str(e), "success": False}), 500
 
-@app.route('/delete_zone', methods=['POST'])
+@app.route('/delete_zone', methods=['POST', 'OPTIONS'])
 def delete_zone():
     try:
         data = request.json
@@ -310,4 +323,4 @@ if __name__ == '__main__':
     bot_thread.daemon = True
     bot_thread.start()
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8080) # Жестко задаем порт 8080 для Render
