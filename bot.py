@@ -6,7 +6,6 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
 import os
-import traceback
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8803648566:AAHmG4XTMTDqfIHlWjBeDsKCGmQ18pxKnGQ")
 ADMIN_CHAT_ID = 7929131842
@@ -20,28 +19,26 @@ def get_db_connection():
 
 def init_db():
     try:
-        print("🔄 Подключение к PostgreSQL...")
         conn = get_db_connection()
         c = conn.cursor()
         
-        print("🔄 Создание таблицы points...")
+        # Создаем таблицу точек (если нет)
         c.execute('''CREATE TABLE IF NOT EXISTS points
                      (id SERIAL PRIMARY KEY,
                       title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
         
-        print("🔄 Пересоздание таблицы parkings...")
-        c.execute("DROP TABLE IF EXISTS parkings")
-        c.execute('''CREATE TABLE parkings
+        # ✅ ИСПРАВЛЕНО: Больше не удаляем таблицу! Просто создаем, если её нет.
+        # Это сохранит все старые парковки при перезапуске бота.
+        c.execute('''CREATE TABLE IF NOT EXISTS parkings
                      (id SERIAL PRIMARY KEY,
                       title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
                       available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
         
         conn.commit()
         conn.close()
-        print("✅ База данных успешно инициализирована!")
+        print("✅ База данных успешно инициализирована! Данные сохранены.")
     except Exception as e:
         print(f"❌ Ошибка инициализации БД: {e}")
-        traceback.print_exc()
 
 init_db()
 
@@ -73,34 +70,28 @@ def handle_message(message):
     # 🗑️ 1. УДАЛИТЬ ВСЕ ПАРКОВКИ
     # ==========================================
     if text_lower == 'все p off':
-        try:
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("DELETE FROM parkings")
-            count = c.rowcount
-            conn.commit()
-            conn.close()
-            bot.reply_to(message, f"🗑️ Удалено всех парковок: {count}")
-        except Exception as e:
-            bot.reply_to(message, f"❌ Ошибка: {e}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM parkings")
+        count = c.rowcount
+        conn.commit()
+        conn.close()
+        bot.reply_to(message, f"🗑️ Удалено всех парковок: {count}")
         return
 
     # ==========================================
     # 🗑️ 2. УДАЛИТЬ ПОСЛЕДНЮЮ ПАРКОВКУ
     # ==========================================
     if text_lower == 'last p off':
-        try:
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("DELETE FROM parkings WHERE id = (SELECT MAX(id) FROM parkings)")
-            if c.rowcount > 0:
-                bot.reply_to(message, "🗑️ Последняя парковка успешно удалена.")
-            else:
-                bot.reply_to(message, "❌ Парковок не найдено.")
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            bot.reply_to(message, f"❌ Ошибка: {e}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM parkings WHERE id = (SELECT MAX(id) FROM parkings)")
+        if c.rowcount > 0:
+            bot.reply_to(message, "🗑️ Последняя парковка успешно удалена.")
+        else:
+            bot.reply_to(message, "❌ Парковок не найдено.")
+        conn.commit()
+        conn.close()
         return
 
     # ==========================================
@@ -118,76 +109,68 @@ def handle_message(message):
             elif param_type.lower() == 'с': dead = param_value
             elif param_type.lower() == 'п': broken = param_value
         
-        try:
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("SELECT available_count, dead_count, broken_count FROM parkings WHERE title = %s", (title,))
-            row = c.fetchone()
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT available_count, dead_count, broken_count FROM parkings WHERE title = %s", (title,))
+        row = c.fetchone()
+        
+        if row:
+            current_avail, current_dead, current_broken = row
+            new_avail = avail if avail is not None else current_avail
+            new_dead = dead if dead is not None else current_dead
+            new_broken = broken if broken is not None else current_broken
             
-            if row:
-                current_avail, current_dead, current_broken = row
-                new_avail = avail if avail is not None else current_avail
-                new_dead = dead if dead is not None else current_dead
-                new_broken = broken if broken is not None else current_broken
-                
-                c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE title = %s", 
-                         (new_avail, new_dead, new_broken, title))
-                conn.commit()
-                
-                response_parts = []
-                if avail is not None: response_parts.append(f"В доступе: {avail}")
-                if dead is not None: response_parts.append(f"Севшие: {dead}")
-                if broken is not None: response_parts.append(f"Поломки: {broken}")
-                
-                bot.reply_to(message, f"✅ Парковка \"{title}\" обновлена: {', '.join(response_parts)}")
-            else:
-                bot.reply_to(message, f"❌ Парковка \"{title}\" не найдена в базе данных.")
+            c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE title = %s", 
+                     (new_avail, new_dead, new_broken, title))
+            conn.commit()
             conn.close()
-        except Exception as e:
-            bot.reply_to(message, f"❌ Ошибка БД: {e}")
+            
+            response_parts = []
+            if avail is not None: response_parts.append(f"В доступе: {avail}")
+            if dead is not None: response_parts.append(f"Севшие: {dead}")
+            if broken is not None: response_parts.append(f"Поломки: {broken}")
+            
+            bot.reply_to(message, f"✅ Парковка \"{title}\" обновлена: {', '.join(response_parts)}")
+        else:
+            bot.reply_to(message, f"❌ Парковка \"{title}\" не найдена в базе данных.")
         return
 
     # ==========================================
-    # 🅿️ 4. СОЗДАНИЕ ПАРКОВКИ (новый формат: Адрес - Название - P)
+    # 🅿️ 4. СОЗДАНИЕ ПАРКОВКИ (Твоя рабочая логика)
     # ==========================================
-    if text_lower.endswith('- p'):
-        # Отрезаем "- P" с конца
-        text_without_p = text[:-3].strip()
+    if text_lower.endswith(' - p'):
+        clean_text = text[:-4].strip()
         
-        # Теперь разбиваем по последнему дефису: Адрес - Название
-        if '-' in text_without_p:
-            parts = text_without_p.rsplit('-', 1)
+        if '-' in clean_text:
+            parts = clean_text.rsplit('-', 1) 
             location_part = parts[0].strip()
             title = parts[1].strip()
             
             if not location_part or not title:
-                bot.reply_to(message, "⚠️ Формат: Адрес - Название - P\nПример: Ленина 10 - Офис - P")
+                bot.reply_to(message, "⚠️ Формат: Адрес - Название - P")
                 return
-            
+
             coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
+            
             if coord_match:
-                lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
+                lat = float(coord_match.group(1))
+                lon = float(coord_match.group(2))
             else:
                 bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
                 lat, lon = get_coordinates(location_part)
                 
             if lat and lon:
-                try:
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute("INSERT INTO parkings (title, address, lat, lon) VALUES (%s, %s, %s, %s)",
-                             (title, location_part, lat, lon))
-                    conn.commit()
-                    conn.close()
-                    bot.reply_to(message, f"✅ Парковка '{title}' успешно добавлена!")
-                except psycopg.IntegrityError:
-                    bot.reply_to(message, f"⚠️ Парковка '{title}' уже существует.")
-                except Exception as e:
-                    bot.reply_to(message, f"❌ Ошибка БД: {e}")
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO parkings (title, address, lat, lon) VALUES (%s, %s, %s, %s)",
+                         (title, location_part, lat, lon))
+                conn.commit()
+                conn.close()
+                bot.reply_to(message, f"✅ Парковка '{title}' успешно добавлена!")
             else:
                 bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
         else:
-            bot.reply_to(message, "⚠️ Формат: Адрес - Название - P\nПример: Ленина 10 - Офис - P")
+            bot.reply_to(message, "⚠️ Формат: Адрес - Название - P")
         return
 
     # ==========================================
@@ -199,33 +182,32 @@ def handle_message(message):
         title = parts[1].strip()
         
         if not location_part or not title:
-            bot.reply_to(message, "⚠️ Формат: Адрес - Название\nПример: Ленина 10 - Офис")
+            bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название")
             return
 
         coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
+        
         if coord_match:
-            lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
+            lat = float(coord_match.group(1))
+            lon = float(coord_match.group(2))
         else:
             bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
             lat, lon = get_coordinates(location_part)
             
         if lat and lon:
-            try:
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute("INSERT INTO points (title, address, lat, lon, status) VALUES (%s, %s, %s, %s, 'active')",
-                         (title, location_part, lat, lon))
-                conn.commit()
-                conn.close()
-                bot.reply_to(message, f"✅ Точка '{title}' успешно добавлена!")
-            except Exception as e:
-                bot.reply_to(message, f"❌ Ошибка БД: {e}")
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("INSERT INTO points (title, address, lat, lon, status) VALUES (%s, %s, %s, %s, 'active')",
+                     (title, location_part, lat, lon))
+            conn.commit()
+            conn.close()
+            bot.reply_to(message, f"✅ Точка '{title}' успешно добавлена!")
         else:
             bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
-    else:
-        bot.reply_to(message, "⚠️ Формат:\n• Для точки: Адрес - Название\n• Для парковки: Адрес - Название - P\n\nПримеры:\n• Ленина 10 - Офис\n• Гагарина 5 - Склад - P")
 
-# --- API ЭНДПОИНТЫ ---
+# ==========================================
+# 🌐 API ЭНДПОИНТЫ ДЛЯ КАРТЫ
+# ==========================================
 
 @app.route('/')
 def serve_website():
@@ -233,38 +215,31 @@ def serve_website():
 
 @app.route('/get_points')
 def get_points():
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT id, title, address, lat, lon, status FROM points WHERE status != 'found'")
-        points = [{"id": row[0], "title": row[1], "address": row[2], "lat": row[3], "lon": row[4], "status": row[5]} for row in c.fetchall()]
-        conn.close()
-        return jsonify(points)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, title, address, lat, lon, status FROM points WHERE status != 'found'")
+    points = [{"id": row[0], "title": row[1], "address": row[2], "lat": row[3], "lon": row[4], "status": row[5]} for row in c.fetchall()]
+    conn.close()
+    return jsonify(points)
 
 @app.route('/update_status', methods=['POST'])
 def update_status():
-    try:
-        data = request.json
-        point_id = data.get('id')
-        status = data.get('status')
-        conn = get_db_connection()
-        c = conn.cursor()
-        if status == 'found':
-            c.execute("DELETE FROM points WHERE id = %s", (point_id,))
-        else:
-            c.execute("UPDATE points SET status = %s WHERE id = %s", (status, point_id))
-        conn.commit()
-        conn.close()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    data = request.json
+    point_id = data.get('id')
+    status = data.get('status')
+    conn = get_db_connection()
+    c = conn.cursor()
+    if status == 'found':
+        c.execute("DELETE FROM points WHERE id = %s", (point_id,))
+    else:
+        c.execute("UPDATE points SET status = %s WHERE id = %s", (status, point_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 @app.route('/get_parkings')
 def get_parkings():
     try:
-        print("🔄 Запрос /get_parkings получен")
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT id, title, address, lat, lon, available_count, dead_count, broken_count FROM parkings")
@@ -283,27 +258,20 @@ def get_parkings():
                 "broken": row[7] if row[7] is not None else '?'
             })
         conn.close()
-        print(f"✅ Успешно возвращено {len(parkings)} парковок")
         return jsonify(parkings)
     except Exception as e:
-        error_msg = str(e)
-        print(f"❌ Ошибка в /get_parkings: {error_msg}")
-        traceback.print_exc()
-        return jsonify({"error": "Внутренняя ошибка сервера", "details": error_msg}), 500
+        return jsonify({"error": "Внутренняя ошибка сервера", "details": str(e)}), 500
 
 @app.route('/update_parking', methods=['POST'])
 def update_parking():
-    try:
-        data = request.json
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE id = %s", 
-                  (data.get('available', '?'), data.get('dead', '?'), data.get('broken', '?'), data.get('id')))
-        conn.commit()
-        conn.close()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    data = request.json
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE id = %s", 
+              (data.get('available', '?'), data.get('dead', '?'), data.get('broken', '?'), data.get('id')))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 def run_bot():
     bot.polling(none_stop=True)
