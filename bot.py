@@ -189,7 +189,141 @@ def handle_message(message):
             except Exception as e:
                 bot.reply_to(message, f"❌ Ошибка БД: {e}")
         else:
-            bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
+            bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    if message.chat.id != ADMIN_CHAT_ID or message.text is None:
+        return 
+
+    text = message.text.strip()
+    text_lower = text.lower()
+
+    # --- 1. ПРОВЕРКА НА КОМАНДЫ УДАЛЕНИЯ ---
+    if text_lower == 'все p off':
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM parkings")
+            count = c.rowcount
+            conn.commit()
+            conn.close()
+            bot.reply_to(message, f"🗑️ Удалено всех парковок: {count}")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка: {e}")
+        return
+
+    if text_lower == 'last p off':
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM parkings WHERE id = (SELECT MAX(id) FROM parkings)")
+            if c.rowcount > 0:
+                bot.reply_to(message, "🗑️ Последняя парковка успешно удалена.")
+            else:
+                bot.reply_to(message, "❌ Парковок не найдено.")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка: {e}")
+        return
+
+    # --- 2. ОБНОВЛЕНИЕ ПАРКОВОК (Д, С, П) ---
+    parking_match = re.match(r'^(.+?)\s+([ДдСсПп]\d+(?:\s+[ДдСсПп]\d+)*)$', text)
+    if parking_match:
+        title = parking_match.group(1).strip()
+        params_str = parking_match.group(2)
+        
+        avail = dead = broken = None
+        params = re.findall(r'([ДдСсПп])(\d+)', params_str)
+        for param_type, param_value in params:
+            if param_type.lower() == 'д': avail = param_value
+            elif param_type.lower() == 'с': dead = param_value
+            elif param_type.lower() == 'п': broken = param_value
+        
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT available_count, dead_count, broken_count FROM parkings WHERE title = %s", (title,))
+            row = c.fetchone()
+            
+            if row:
+                current_avail, current_dead, current_broken = row
+                new_avail = avail if avail is not None else current_avail
+                new_dead = dead if dead is not None else current_dead
+                new_broken = broken if broken is not None else current_broken
+                
+                c.execute("UPDATE parkings SET available_count = %s, dead_count = %s, broken_count = %s WHERE title = %s", 
+                         (new_avail, new_dead, new_broken, title))
+                conn.commit()
+                
+                response_parts = []
+                if avail is not None: response_parts.append(f"В доступе: {avail}")
+                if dead is not None: response_parts.append(f"Севшие: {dead}")
+                if broken is not None: response_parts.append(f"Поломки: {broken}")
+                
+                bot.reply_to(message, f"✅ Парковка \"{title}\" обновлена: {', '.join(response_parts)}")
+            else:
+                bot.reply_to(message, f"❌ Парковка \"{title}\" не найдена в базе данных.")
+            conn.close()
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка БД: {e}")
+        return
+
+    # --- 3. СОЗДАНИЕ ТОЧКИ (ЖЁСТКАЯ ЛОГИКА) ---
+    # Если сообщение начинается с "Создать P -" (или "Создать Р -" с русской Р), 
+    # мы ЗАБИРАЕМ только то, что идет ПОСЛЕ тире.
+    create_match = re.match(r'^\s*[Сс]оздать\s+[PpРр]\s*[-–—]\s*(.+)$', text)
+    
+    if create_match:
+        # Берем строго то, что после "Создать P - "
+        remainder = create_match.group(1).strip()
+        
+        # Если внутри остатка есть еще одно тире, значит формат: "Адрес - Название"
+        if '-' in remainder or '–' in remainder or '—' in remainder:
+            parts = re.split(r'[-–—]', remainder, maxsplit=1)
+            location_part = parts[0].strip()
+            title = parts[1].strip()
+        else:
+            # Если второго тире нет, значит пользователь ввел просто "Создать P - улица Кирова"
+            # Используем этот текст и как адрес для поиска, и как название точки
+            location_part = remainder
+            title = remainder
+    else:
+        # Стандартная логика, если префикса "Создать P -" НЕТ
+        normalized_text = text.replace('–', '-').replace('—', '-')
+        if '-' in normalized_text:
+            parts = normalized_text.rsplit('-', 1) 
+            location_part = parts[0].strip()
+            title = parts[1].strip()
+        else:
+            location_part = normalized_text.strip()
+            title = normalized_text.strip()
+
+    # Проверка на пустоту
+    if not location_part or not title:
+        bot.reply_to(message, "⚠️ Формат: Создать P - Адрес или Координаты - Название")
+        return
+
+    # Проверка на координаты
+    coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
+    if coord_match:
+        lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
+    else:
+        bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
+        lat, lon = get_coordinates(location_part)
+        
+    if lat and lon:
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("INSERT INTO points (title, address, lat, lon, status) VALUES (%s, %s, %s, %s, 'active')",
+                     (title, location_part, lat, lon))
+            conn.commit()
+            conn.close()
+            bot.reply_to(message, f"✅ Точка '{title}' успешно добавлена!")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка БД: {e}")
+    else:
+        bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
 
 # --- API ЭНДПОИНТЫ ---
 
