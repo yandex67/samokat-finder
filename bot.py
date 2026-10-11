@@ -18,31 +18,24 @@ def init_db():
         conn = sqlite3.connect('points.db')
         c = conn.cursor()
         
-        # 1. Создаем таблицу точек (если нет)
+        # Создаем таблицу точек (если нет)
         c.execute('''CREATE TABLE IF NOT EXISTS points
                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
                       title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
         
-        # 2. Создаем таблицу парковок (если нет)
-        c.execute('''CREATE TABLE IF NOT EXISTS parkings
+        # ✅ УДАЛЯЕМ старую таблицу парковок и создаём заново с правильной структурой
+        c.execute("DROP TABLE IF EXISTS parkings")
+        c.execute('''CREATE TABLE parkings
                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
                       title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
                       available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
         
-        # ✅ 3. ГЛАВНОЕ ИСПРАВЛЕНИЕ: Добавляем колонку broken_count в существующую таблицу, если её там нет
-        try:
-            c.execute("ALTER TABLE parkings ADD COLUMN broken_count TEXT DEFAULT '?'")
-            print("✅ Добавлена колонка broken_count в таблицу parkings")
-        except sqlite3.OperationalError:
-            pass # Колонка уже существует, это нормально
-            
         conn.commit()
         conn.close()
-        print("✅ База данных успешно инициализирована!")
+        print("✅ База данных успешно инициализирована! Таблица parkings пересоздана.")
     except Exception as e:
         print(f"❌ Ошибка инициализации БД: {e}")
 
-# Вызываем инициализацию при запуске
 init_db()
 
 def get_coordinates(address):
@@ -76,7 +69,7 @@ def handle_message(message):
         count = c.rowcount
         conn.commit()
         conn.close()
-        bot.reply_to(message, f"🗑️ Удалено всех парковок: {count}")
+        bot.reply_to(message, f"️ Удалено всех парковок: {count}")
         return
 
     if text_lower == 'last p off':
@@ -142,7 +135,7 @@ def handle_message(message):
         if coord_match:
             lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
         else:
-            bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
+            bot.reply_to(message, f" Ищу '{location_part}' в г. Смоленск...")
             lat, lon = get_coordinates(location_part)
             
         if lat and lon:
