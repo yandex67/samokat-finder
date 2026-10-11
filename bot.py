@@ -1,6 +1,7 @@
 import telebot
 import requests
 import psycopg
+import json
 import re
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -12,7 +13,8 @@ ADMIN_CHAT_ID = 7929131842
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://mapbotuser:r47l5ou0pDueVnus4tiD3d2w7hYQJ1vy@dpg-db4fc5ks728c73ajgig0-a.frankfurt-postgres.render.com/mapbotdb")
 
 app = Flask(__name__)
-CORS(app)
+# ✅ ЯВНАЯ НАСТРОЙКА CORS для разрешения запросов с GitHub Pages
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 def get_db_connection():
     return psycopg.connect(DATABASE_URL)
@@ -22,21 +24,26 @@ def init_db():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # Создаем таблицу точек (если нет)
+        # 1. Таблица обычных точек
         c.execute('''CREATE TABLE IF NOT EXISTS points
                      (id SERIAL PRIMARY KEY,
                       title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
         
-        # ✅ ИСПРАВЛЕНО: Больше не удаляем таблицу! Просто создаем, если её нет.
-        # Это сохранит все старые парковки при перезапуске бота.
+        # 2. Таблица парковок (без DROP, чтобы сохранять данные)
         c.execute('''CREATE TABLE IF NOT EXISTS parkings
                      (id SERIAL PRIMARY KEY,
                       title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
                       available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
         
+        # 3. ✅ ВОССТАНОВЛЕНО: Таблица зон
+        c.execute('''CREATE TABLE IF NOT EXISTS zones
+                     (id SERIAL PRIMARY KEY,
+                      coords JSONB,
+                      comment TEXT)''')
+        
         conn.commit()
         conn.close()
-        print("✅ База данных успешно инициализирована! Данные сохранены.")
+        print("✅ База данных успешно инициализирована! Все таблицы на месте.")
     except Exception as e:
         print(f"❌ Ошибка инициализации БД: {e}")
 
@@ -66,9 +73,6 @@ def handle_message(message):
     text = message.text.strip()
     text_lower = text.lower()
 
-    # ==========================================
-    # 🗑️ 1. УДАЛИТЬ ВСЕ ПАРКОВКИ
-    # ==========================================
     if text_lower == 'все p off':
         conn = get_db_connection()
         c = conn.cursor()
@@ -79,9 +83,6 @@ def handle_message(message):
         bot.reply_to(message, f"🗑️ Удалено всех парковок: {count}")
         return
 
-    # ==========================================
-    # 🗑️ 2. УДАЛИТЬ ПОСЛЕДНЮЮ ПАРКОВКУ
-    # ==========================================
     if text_lower == 'last p off':
         conn = get_db_connection()
         c = conn.cursor()
@@ -94,9 +95,6 @@ def handle_message(message):
         conn.close()
         return
 
-    # ==========================================
-    # 🅿️ 3. ОБНОВЛЕНИЕ ДАННЫХ ПАРКОВКИ (Д, С, П)
-    # ==========================================
     parking_match = re.match(r'^(.+?)\s+([ДдСсПп]\d+(?:\s+[ДдСсПп]\d+)*)$', text)
     if parking_match:
         title = parking_match.group(1).strip()
@@ -135,12 +133,8 @@ def handle_message(message):
             bot.reply_to(message, f"❌ Парковка \"{title}\" не найдена в базе данных.")
         return
 
-    # ==========================================
-    # 🅿️ 4. СОЗДАНИЕ ПАРКОВКИ (Твоя рабочая логика)
-    # ==========================================
     if text_lower.endswith(' - p'):
         clean_text = text[:-4].strip()
-        
         if '-' in clean_text:
             parts = clean_text.rsplit('-', 1) 
             location_part = parts[0].strip()
@@ -151,7 +145,6 @@ def handle_message(message):
                 return
 
             coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
-            
             if coord_match:
                 lat = float(coord_match.group(1))
                 lon = float(coord_match.group(2))
@@ -173,9 +166,6 @@ def handle_message(message):
             bot.reply_to(message, "⚠️ Формат: Адрес - Название - P")
         return
 
-    # ==========================================
-    # 📍 5. СОЗДАНИЕ ОБЫЧНОЙ ТОЧКИ (САМОКАТА)
-    # ==========================================
     if '-' in text:
         parts = text.rsplit('-', 1) 
         location_part = parts[0].strip()
@@ -186,7 +176,6 @@ def handle_message(message):
             return
 
         coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
-        
         if coord_match:
             lat = float(coord_match.group(1))
             lon = float(coord_match.group(2))
@@ -248,11 +237,8 @@ def get_parkings():
             if row[3] is None or row[4] is None: 
                 continue
             parkings.append({
-                "id": row[0], 
-                "title": row[1] or "Без названия", 
-                "address": row[2] or "?", 
-                "lat": float(row[3]), 
-                "lon": float(row[4]), 
+                "id": row[0], "title": row[1] or "Без названия", "address": row[2] or "?", 
+                "lat": float(row[3]), "lon": float(row[4]), 
                 "available": row[5] if row[5] is not None else '?', 
                 "dead": row[6] if row[6] is not None else '?', 
                 "broken": row[7] if row[7] is not None else '?'
@@ -260,7 +246,7 @@ def get_parkings():
         conn.close()
         return jsonify(parkings)
     except Exception as e:
-        return jsonify({"error": "Внутренняя ошибка сервера", "details": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/update_parking', methods=['POST'])
 def update_parking():
@@ -272,6 +258,49 @@ def update_parking():
     conn.commit()
     conn.close()
     return jsonify({"success": True})
+
+# ✅ ВОССТАНОВЛЕНО: Эндпоинты для работы с зонами
+@app.route('/get_zones', methods=['GET'])
+def get_zones():
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id, coords, comment FROM zones")
+        zones = [{"id": row[0], "coords": row[1], "comment": row[2]} for row in c.fetchall()]
+        conn.close()
+        return jsonify(zones)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/add_zone', methods=['POST'])
+def add_zone():
+    try:
+        data = request.json
+        coords = data.get('coords')
+        comment = data.get('comment', '')
+        conn = get_db_connection()
+        c = conn.cursor()
+        # Сохраняем координаты как JSON
+        c.execute("INSERT INTO zones (coords, comment) VALUES (%s, %s)", (json.dumps(coords), comment))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+@app.route('/delete_zone', methods=['POST'])
+def delete_zone():
+    try:
+        data = request.json
+        zone_id = data.get('id')
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM zones WHERE id = %s", (zone_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
 
 def run_bot():
     bot.polling(none_stop=True)
