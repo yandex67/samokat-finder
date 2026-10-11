@@ -70,6 +70,18 @@ def handle_message(message):
     text = message.text.strip()
     text_lower = text.lower()
 
+    # --- 1. УБИРАЕМ МУСОРНЫЕ ПРЕФИКСЫ ---
+    # Если пользователь копирует команды вида "Создать P - ..." или "Создать точку ..."
+    has_create_prefix = False
+    create_prefixes = ['создать p', 'создать точку', 'создать']
+    for p in create_prefixes:
+        if text_lower.startswith(p):
+            # Отрезаем префикс и любые следующие за ним пробелы или тире
+            text = text[len(p):].lstrip(' -–—').strip()
+            text_lower = text.lower()
+            has_create_prefix = True
+            break
+
     if text_lower == 'все p off':
         try:
             conn = get_db_connection()
@@ -139,11 +151,21 @@ def handle_message(message):
             bot.reply_to(message, f"❌ Ошибка БД: {e}")
         return
 
-    if '-' in text:
-        parts = text.rsplit('-', 1) 
-        location_part = parts[0].strip()
-        title = parts[1].strip()
-        
+    # --- 2. СОЗДАНИЕ ТОЧКИ ---
+    # Заменяем возможные длинные тире на обычные для единообразия
+    normalized_text = text.replace('–', '-').replace('—', '-')
+    
+    # Создаем точку, если есть дефис ИЛИ если была команда "создать" (и остался текст)
+    if '-' in normalized_text or (has_create_prefix and normalized_text):
+        if '-' in normalized_text:
+            parts = normalized_text.rsplit('-', 1) 
+            location_part = parts[0].strip()
+            title = parts[1].strip()
+        else:
+            # Если дефиса нет, считаем весь текст адресом/координатами, а название берем из него же
+            location_part = normalized_text.strip()
+            title = normalized_text.strip()
+            
         if not location_part or not title:
             bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название")
             return
