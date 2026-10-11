@@ -148,22 +148,58 @@ def handle_message(message):
         return
 
     # ==========================================
-    # ✅ 4. ИСПРАВЛЕННОЕ СОЗДАНИЕ ТОЧКИ / ПАРКОВКИ
+    # 🅿️ 4. СОЗДАНИЕ ПАРКОВКИ (новый формат: Адрес - Название - P)
     # ==========================================
-    # Если сообщение начинается с "создать p", убираем эту команду, чтобы она не мешала поиску адреса
-    if text_lower.startswith('создать p'):
-        text = text[8:].strip() # Отрезаем "создать p" (8 символов)
-        if text.startswith('-'):
-            text = text[1:].strip() # Убираем лишний дефис, если он есть сразу после команды
+    if text_lower.endswith('- p'):
+        # Отрезаем "- P" с конца
+        text_without_p = text[:-3].strip()
+        
+        # Теперь разбиваем по последнему дефису: Адрес - Название
+        if '-' in text_without_p:
+            parts = text_without_p.rsplit('-', 1)
+            location_part = parts[0].strip()
+            title = parts[1].strip()
+            
+            if not location_part or not title:
+                bot.reply_to(message, "⚠️ Формат: Адрес - Название - P\nПример: Ленина 10 - Офис - P")
+                return
+            
+            coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
+            if coord_match:
+                lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
+            else:
+                bot.reply_to(message, f"⏳ Ищу '{location_part}' в г. Смоленск...")
+                lat, lon = get_coordinates(location_part)
+                
+            if lat and lon:
+                try:
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("INSERT INTO parkings (title, address, lat, lon) VALUES (%s, %s, %s, %s)",
+                             (title, location_part, lat, lon))
+                    conn.commit()
+                    conn.close()
+                    bot.reply_to(message, f"✅ Парковка '{title}' успешно добавлена!")
+                except psycopg.IntegrityError:
+                    bot.reply_to(message, f"⚠️ Парковка '{title}' уже существует.")
+                except Exception as e:
+                    bot.reply_to(message, f"❌ Ошибка БД: {e}")
+            else:
+                bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
+        else:
+            bot.reply_to(message, "⚠️ Формат: Адрес - Название - P\nПример: Ленина 10 - Офис - P")
+        return
 
-    # Теперь обрабатываем как обычно: Адрес - Название
+    # ==========================================
+    # 📍 5. СОЗДАНИЕ ОБЫЧНОЙ ТОЧКИ (САМОКАТА)
+    # ==========================================
     if '-' in text:
         parts = text.rsplit('-', 1) 
         location_part = parts[0].strip()
         title = parts[1].strip()
         
         if not location_part or not title:
-            bot.reply_to(message, "⚠️ Формат: Адрес или Координаты - Название")
+            bot.reply_to(message, "⚠️ Формат: Адрес - Название\nПример: Ленина 10 - Офис")
             return
 
         coord_match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$', location_part)
@@ -187,7 +223,7 @@ def handle_message(message):
         else:
             bot.reply_to(message, f"❌ Не удалось найти: '{location_part}' в Смоленске.")
     else:
-        bot.reply_to(message, "⚠️ Формат: Создать P - Адрес - Название\nПример: Создать P - Ленина 10 - Офис")
+        bot.reply_to(message, "⚠️ Формат:\n• Для точки: Адрес - Название\n• Для парковки: Адрес - Название - P\n\nПримеры:\n• Ленина 10 - Офис\n• Гагарина 5 - Склад - P")
 
 # --- API ЭНДПОИНТЫ ---
 
