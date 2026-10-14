@@ -549,7 +549,7 @@
                             icon: L.divIcon({
                                 className: 'custom-div-icon',
                                 html: '<div style="background: black; color: white; font-size: 8px; font-weight: bold; padding: 3px 4px; border-radius: 3px; text-align: center; width: 44px; box-sizing: border-box; line-height: 1.2;">Выехали</div>',
-                                iconSize: [44, 16], iconAnchor: [22, 76]
+                                iconSize: [44, 16], iconAnchor: [22, 92]
                             }),
                             interactive: false
                         }).addTo(osmMap);
@@ -613,23 +613,48 @@
         }
 
         function showChoiceMenu(pointId, pointTitle) {
+            // Для Яндекс Карт
             var pm = markers.find(function(m) { var d = m.properties.get('pointData'); return d && d.id === pointId; });
-            if (!pm) return;
-            var point = pm.properties.get('pointData');
-            var esc = pointTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-            h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
-            h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
-            h += '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>';
-            h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
-            h += '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>';
-            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>';
-            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>';
-            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>';
-            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>';
-            h += '<button onclick="event.stopPropagation(); openCustomInputModal(' + point.id + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>';
-            h += '</div></div>';
-            pm.properties.set('balloonContent', h); pm.balloon.open();
+            if (pm) {
+                var point = pm.properties.get('pointData');
+                var esc = pointTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+                h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
+                h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
+                h += '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>';
+                h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
+                h += '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>';
+                h += '<button onclick="event.stopPropagation(); openCustomInputModal(' + pointId + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>';
+                h += '</div></div>';
+                pm.properties.set('balloonContent', h); 
+                pm.balloon.open();
+                return;
+            }
+
+            // Для OpenStreetMap (Leaflet)
+            var osmPm = osmMarkers.find(function(m) { return m.pointData && m.pointData.id === pointId; });
+            if (osmPm) {
+                var point = osmPm.pointData;
+                var esc = pointTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+                h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
+                h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
+                h += '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>';
+                h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
+                h += '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>';
+                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>';
+                h += '<button onclick="event.stopPropagation(); openCustomInputModal(' + pointId + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>';
+                h += '</div></div>';
+                osmPm.setPopupContent(h);
+                osmPm.openPopup();
+            }
         }
 
         function createParkingIcon() {
@@ -819,26 +844,55 @@
         }
 
         function startEditParking(id) {
+            // Для Яндекс Карт
             var pm = parkingMarkers.find(function(m) { var d = m.properties.get('parkingData'); return d && d.id === id; });
-            if (!pm) return;
-            var p = pm.properties.get('parkingData');
-            var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-            html += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>';
-            html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
-            html += '<div><button id="btn_avail_' + id + '" onclick="event.stopPropagation(); activateInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>';
-            html += '<input id="inp_avail_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-            html += '<div><button id="btn_dead_' + id + '" onclick="event.stopPropagation(); activateInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>';
-            html += '<input id="inp_dead_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-            html += '<div><button id="btn_broken_' + id + '" onclick="event.stopPropagation(); activateInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>';
-            html += '<input id="inp_broken_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-            html += '<button onclick="event.stopPropagation(); saveParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>';
-            html += '</div></div>';
-            pm.properties.set('balloonContent', html); pm.balloon.open();
+            if (pm) {
+                var p = pm.properties.get('parkingData');
+                var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+                html += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>';
+                html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                html += '<div><button id="btn_avail_' + id + '" onclick="event.stopPropagation(); activateInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>';
+                html += '<input id="inp_avail_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+                html += '<div><button id="btn_dead_' + id + '" onclick="event.stopPropagation(); activateInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>';
+                html += '<input id="inp_dead_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+                html += '<div><button id="btn_broken_' + id + '" onclick="event.stopPropagation(); activateInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>';
+                html += '<input id="inp_broken_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+                html += '<button onclick="event.stopPropagation(); saveParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>';
+                html += '</div></div>';
+                pm.properties.set('balloonContent', html); 
+                pm.balloon.open();
+                return;
+            }
+
+            // Для OpenStreetMap (Leaflet)
+            var osmPm = osmParkingMarkers.find(function(m) { return m.parkingData && m.parkingData.id === id; });
+            if (osmPm) {
+                var p = osmPm.parkingData;
+                var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+                html += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>';
+                html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                html += '<div><button id="osm_btn_avail_' + id + '" onclick="event.stopPropagation(); activateOsmInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>';
+                html += '<input id="osm_inp_avail_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+                html += '<div><button id="osm_btn_dead_' + id + '" onclick="event.stopPropagation(); activateOsmInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>';
+                html += '<input id="osm_inp_dead_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+                html += '<div><button id="osm_btn_broken_' + id + '" onclick="event.stopPropagation(); activateOsmInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>';
+                html += '<input id="osm_inp_broken_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+                html += '<button onclick="event.stopPropagation(); saveOsmParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>';
+                html += '</div></div>';
+                osmPm.setPopupContent(html);
+                osmPm.openPopup();
+            }
         }
 
         function activateInput(type, id) {
             document.getElementById('btn_' + type + '_' + id).style.display = 'none';
             var inp = document.getElementById('inp_' + type + '_' + id);
+            inp.style.display = 'block'; inp.value = ''; inp.focus();
+        }
+
+        function activateOsmInput(type, id) {
+            document.getElementById('osm_btn_' + type + '_' + id).style.display = 'none';
+            var inp = document.getElementById('osm_inp_' + type + '_' + id);
             inp.style.display = 'block'; inp.value = ''; inp.focus();
         }
 
@@ -848,6 +902,21 @@
             var inpBroken = document.getElementById('inp_broken_' + id);
             var pm = parkingMarkers.find(function(m) { var d = m.properties.get('parkingData'); return d && d.id === id; });
             var oldData = pm ? pm.properties.get('parkingData') : {available: '?', dead: '?', broken: '?'};
+            var newAvail = inpAvail.style.display !== 'none' && inpAvail.value.trim() !== '' ? inpAvail.value.trim() : oldData.available;
+            var newDead = inpDead.style.display !== 'none' && inpDead.value.trim() !== '' ? inpDead.value.trim() : oldData.dead;
+            var newBroken = inpBroken.style.display !== 'none' && inpBroken.value.trim() !== '' ? inpBroken.value.trim() : oldData.broken;
+            fetch(API_URL + '/update_parking', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, available: newAvail, dead: newDead, broken: newBroken })
+            }).then(function(r) { return r.json(); }).then(function(data) { if (data.success) loadParkings(); });
+        }
+
+        function saveOsmParking(id) {
+            var inpAvail = document.getElementById('osm_inp_avail_' + id);
+            var inpDead = document.getElementById('osm_inp_dead_' + id);
+            var inpBroken = document.getElementById('osm_inp_broken_' + id);
+            var osmPm = osmParkingMarkers.find(function(m) { return m.parkingData && m.parkingData.id === id; });
+            var oldData = osmPm ? osmPm.parkingData : {available: '?', dead: '?', broken: '?'};
             var newAvail = inpAvail.style.display !== 'none' && inpAvail.value.trim() !== '' ? inpAvail.value.trim() : oldData.available;
             var newDead = inpDead.style.display !== 'none' && inpDead.value.trim() !== '' ? inpDead.value.trim() : oldData.dead;
             var newBroken = inpBroken.style.display !== 'none' && inpBroken.value.trim() !== '' ? inpBroken.value.trim() : oldData.broken;
