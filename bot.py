@@ -34,44 +34,34 @@ def init_db():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 1. Таблица точек (самокаты)
         c.execute('''CREATE TABLE IF NOT EXISTS points
                      (id SERIAL PRIMARY KEY, title TEXT, address TEXT, lat REAL, lon REAL, status TEXT DEFAULT 'active')''')
         try:
             c.execute("ALTER TABLE points ADD COLUMN comment TEXT")
-            print("✅ Добавлена колонка comment в points")
         except psycopg.errors.DuplicateColumn:
             pass
         try:
             c.execute("ALTER TABLE points ADD COLUMN url TEXT")
-            print("✅ Добавлена колонка url в points")
         except psycopg.errors.DuplicateColumn:
             pass
         
-        # 2. Таблица парковок
         c.execute('''CREATE TABLE IF NOT EXISTS parkings
                      (id SERIAL PRIMARY KEY, title TEXT UNIQUE, address TEXT, lat REAL, lon REAL, 
                       available_count TEXT DEFAULT '?', dead_count TEXT DEFAULT '?', broken_count TEXT DEFAULT '?')''')
         try:
             c.execute("ALTER TABLE parkings ADD COLUMN photo_url TEXT")
-            print("✅ Добавлена колонка photo_url в parkings")
         except psycopg.errors.DuplicateColumn:
             pass
         
-        # 3. ✅ ТАБЛИЦА ДОП ИНФЫ (создаётся явно)
         c.execute('''CREATE TABLE IF NOT EXISTS info_points
                      (id SERIAL PRIMARY KEY, address TEXT, lat REAL, lon REAL, comment TEXT)''')
-        print("✅ Таблица info_points готова")
         
-        # 4. Таблица зон
         c.execute('''CREATE TABLE IF NOT EXISTS zones
                      (id SERIAL PRIMARY KEY, coords TEXT, comment TEXT)''')
         
-        # 5. Таблица бронирований
         c.execute('''CREATE TABLE IF NOT EXISTS departures
                      (id SERIAL PRIMARY KEY, point_id INTEGER UNIQUE, point_title TEXT, person_name TEXT)''')
         
-        # 6. Таблица настроек
         c.execute('''CREATE TABLE IF NOT EXISTS settings
                      (key TEXT PRIMARY KEY, value TEXT)''')
         c.execute("INSERT INTO settings (key, value) VALUES ('hide_empty_labels', 'false') ON CONFLICT (key) DO NOTHING")
@@ -154,7 +144,7 @@ def handle_message(message):
             conn.commit(); conn.close()
             bot.reply_to(message, f"✅ Статистика всех парковок ({count} шт.) успешно сброшена на '?'")
         except Exception as e:
-            bot.reply_to(message, f"❌ Ошибка при сбросе: {e}")
+            bot.reply_to(message, f" Ошибка при сбросе: {e}")
         return
 
     if text_lower.endswith(' off ссылку'):
@@ -162,7 +152,7 @@ def handle_message(message):
         conn = get_db_connection(); c = conn.cursor()
         c.execute("UPDATE parkings SET photo_url = NULL WHERE title = %s", (name,))
         conn.commit(); conn.close()
-        bot.reply_to(message, f"️ Ссылка на фото для '{name}' удалена.")
+        bot.reply_to(message, f"🗑️ Ссылка на фото для '{name}' удалена.")
         return
 
     if ' http' in text or text.startswith('http'):
@@ -207,7 +197,7 @@ def handle_message(message):
             if c.rowcount > 0:
                 bot.reply_to(message, f"🗑️ Парковка '{title}' успешно удалена.")
             else:
-                bot.reply_to(message, f" Парковка '{title}' не найдена.")
+                bot.reply_to(message, f"❌ Парковка '{title}' не найдена.")
             conn.commit(); conn.close()
             return
         
@@ -251,7 +241,7 @@ def handle_message(message):
         if coord_match:
             lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
         else:
-            bot.reply_to(message, f"⏳ Ищу '{location_part}'...")
+            bot.reply_to(message, f" Ищу '{location_part}'...")
             lat, lon = get_coordinates(location_part)
         if lat and lon:
             conn = get_db_connection(); c = conn.cursor()
@@ -349,19 +339,30 @@ def get_points():
     conn.close()
     return jsonify(points)
 
+# ✅ ЭНДПОИНТЫ ДЛЯ ДОП ИНФЫ С АВТОМАТИЧЕСКИМ СОЗДАНИЕМ ТАБЛИЦЫ
+
 @app.route('/get_info_points')
 def get_info_points():
-    conn = get_db_connection(); c = conn.cursor()
-    c.execute("SELECT id, address, lat, lon, comment FROM info_points")
-    info_points = [{"id": r[0], "address": r[1], "lat": r[2], "lon": r[3], "comment": r[4] or ""} for r in c.fetchall()]
-    conn.close()
-    return jsonify(info_points)
+    try:
+        conn = get_db_connection(); c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS info_points
+                     (id SERIAL PRIMARY KEY, address TEXT, lat REAL, lon REAL, comment TEXT)''')
+        conn.commit()
+        c.execute("SELECT id, address, lat, lon, comment FROM info_points")
+        info_points = [{"id": r[0], "address": r[1], "lat": r[2], "lon": r[3], "comment": r[4] or ""} for r in c.fetchall()]
+        conn.close()
+        return jsonify(info_points)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/add_info_point', methods=['POST'])
 def add_info_point():
     try:
-        data = request.json
         conn = get_db_connection(); c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS info_points
+                     (id SERIAL PRIMARY KEY, address TEXT, lat REAL, lon REAL, comment TEXT)''')
+        conn.commit()
+        data = request.json
         c.execute("INSERT INTO info_points (address, lat, lon, comment) VALUES (%s, %s, %s, %s)", 
                  (data.get('address', ''), data.get('lat'), data.get('lon'), data.get('comment', '')))
         conn.commit(); conn.close()
@@ -372,8 +373,11 @@ def add_info_point():
 @app.route('/delete_info_point', methods=['POST'])
 def delete_info_point():
     try:
-        data = request.json
         conn = get_db_connection(); c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS info_points
+                     (id SERIAL PRIMARY KEY, address TEXT, lat REAL, lon REAL, comment TEXT)''')
+        conn.commit()
+        data = request.json
         c.execute("DELETE FROM info_points WHERE id = %s", (data.get('id'),))
         conn.commit(); conn.close()
         return jsonify({"success": True})
@@ -383,8 +387,11 @@ def delete_info_point():
 @app.route('/update_info_comment', methods=['POST'])
 def update_info_comment():
     try:
-        data = request.json
         conn = get_db_connection(); c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS info_points
+                     (id SERIAL PRIMARY KEY, address TEXT, lat REAL, lon REAL, comment TEXT)''')
+        conn.commit()
+        data = request.json
         c.execute("UPDATE info_points SET comment = %s WHERE id = %s", 
                  (data.get('comment', ''), data.get('id')))
         conn.commit(); conn.close()
