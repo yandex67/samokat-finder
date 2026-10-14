@@ -48,9 +48,9 @@
         .max-dead-modal .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
         .max-dead-modal .modal-actions button { flex: 1; margin-top: 0; }
 
-        /* Стили для Leaflet кастомных иконок */
         .custom-div-icon { background: transparent; border: none; }
         .leaflet-popup-content-wrapper { border-radius: 8px; }
+        .leaflet-popup-content { margin: 12px; }
     </style>
 </head>
 <body>
@@ -62,7 +62,7 @@
         <div class="info" onclick="onInfoClick()">Всего: <span id="pointCount">0</span></div>
     </div>
     <div class="bottom-panel" id="bottomPanel">
-        <button class="close-btn" onclick="closeBottomPanel()">✕</button>
+        <button class="close-btn" onclick="closeBottomPanel()"></button>
         <div id="bottomDeparturesList"></div>
         <div id="deadInfo" class="dead-info" onclick="onDeadInfoClick()">Севшие на парковке: <span id="deadCount">0</span></div>
     </div>
@@ -221,7 +221,6 @@
             });
         }
 
-        // ========== ЗОНЫ ==========
         function loadZones() {
             zones.forEach(function(z) { myMap.geoObjects.remove(z.polygon); if(z.text) myMap.geoObjects.remove(z.text); });
             zones = []; zoneTextMarkers = [];
@@ -233,7 +232,6 @@
                 data.forEach(function(z) {
                     if (!z.coords || !Array.isArray(z.coords) || z.coords.length === 0) return;
                     
-                    // Яндекс
                     var polygon = new ymaps.Polygon([z.coords], {}, {
                         fillColor: '#FFB6C1', fillOpacity: 0.5,
                         strokeColor: '#ff3b30', strokeWidth: 3, strokeStyle: 'solid', draggable: false
@@ -261,7 +259,6 @@
                     }
                     zones.push(zoneObj);
 
-                    // Leaflet OSM
                     var osmPolygon = L.polygon(z.coords, {
                         color: '#ff3b30', weight: 3, fillColor: '#FFB6C1', fillOpacity: 0.5
                     }).addTo(osmMap);
@@ -418,7 +415,8 @@
             myMap.geoObjects.add(zonePolygon);
             isZoneConfirmed = true;
             zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-            if (willSaveZone) { saveZoneToServer(); } else { resetDrawingState(); }
+            if (willSaveZone) { saveZoneToServer(); } 
+            else { exitDrawingModeKeepPolygon(); }
         }
 
         function finishZone() {
@@ -438,8 +436,19 @@
                 document.getElementById('commentOkBtn').style.display = 'none';
             } else {
                 zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-                if (willSaveZone) { saveZoneToServer(); } else { resetDrawingState(); }
+                if (willSaveZone) { saveZoneToServer(); } 
+                else { exitDrawingModeKeepPolygon(); }
             }
+        }
+
+        function exitDrawingModeKeepPolygon() {
+            isDrawingZone = false; drawMode = 1; willSaveZone = false; isZoneConfirmed = false;
+            drawModeSelected = false; isMode3SubMode = false; zonePoints = []; zoneComment = "";
+            freehandStartPoint = null; isDrawingFreehand = false;
+            zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
+            myMap.behaviors.enable('drag'); myMap.behaviors.enable('multiTouch'); myMap.behaviors.enable('scrollZoom'); myMap.behaviors.enable('dblClickZoom');
+            document.getElementById('drawingIndicator').style.display = 'none';
+            myMap.container.getElement().style.cursor = '';
         }
 
         function resetDrawingState() {
@@ -481,7 +490,6 @@
 
         function closeMaxDeadModal() { document.getElementById('maxDeadModal').style.display = 'none'; }
 
-        // ========== ТОЧКИ (САМОКАТЫ) ==========
         function getScooterImage(status) {
             if (status === 'red') return BASE_URL + 'red.png';
             if (status === 'not_found') return BASE_URL + 'black.png';
@@ -525,7 +533,6 @@
                 data.forEach(function(point) {
                     var isBooked = departures[point.id] !== undefined;
                     
-                    // Яндекс
                     var iconOptions = createScooterIcon(point.status, point.title.trim());
                     if (isBooked) {
                         var labelLayout = ymaps.templateLayoutFactory.createClass('<div style="background: black; color: white; font-size: 8px; font-weight: bold; padding: 3px 4px; border-radius: 3px; text-align: center; width: 44px; box-sizing: border-box; line-height: 1.2;">Выехали</div>');
@@ -536,21 +543,21 @@
                     pm.properties.set('pointData', point);
                     myMap.geoObjects.add(pm); markers.push(pm);
 
-                    // Leaflet OSM
                     var osmIcon = createOsmScooterIcon(point.status, point.title.trim());
                     if (isBooked) {
                         var osmLabel = L.marker([point.lat, point.lon], {
                             icon: L.divIcon({
                                 className: 'custom-div-icon',
                                 html: '<div style="background: black; color: white; font-size: 8px; font-weight: bold; padding: 3px 4px; border-radius: 3px; text-align: center; width: 44px; box-sizing: border-box; line-height: 1.2;">Выехали</div>',
-                                iconSize: [44, 16], iconAnchor: [22, 18]
+                                iconSize: [44, 16], iconAnchor: [22, 76]
                             }),
                             interactive: false
                         }).addTo(osmMap);
                         osmLabelMarkers.push(osmLabel);
                     }
                     var osmPm = L.marker([point.lat, point.lon], { icon: osmIcon }).addTo(osmMap);
-                    osmPm.bindPopup(buildBalloonContent(point, isBooked));
+                    var popup = L.popup({ closeOnClick: false, autoClose: false }).setContent(buildBalloonContent(point, isBooked));
+                    osmPm.bindPopup(popup);
                     osmPm.pointData = point;
                     osmMarkers.push(osmPm);
                 });
@@ -562,20 +569,21 @@
             var fzLink = point.url ? '<a href="' + point.url + '" target="_blank" style="color: #1976D2; text-decoration: underline; font-weight: bold; display: block; margin: 5px 0;">ПОСМОТРЕТЬ ФЗ</a>' : '';
             var commentHtml = point.comment ? '<small style="color: #000; display: block; margin: 5px 0;">' + point.comment + '</small>' : '';
             
-            var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;">' +
-                '<b style="font-size: 16px; display: block;">' + point.title + '</b>' +
-                '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>' +
-                fzLink + commentHtml +
-                '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">' +
-                '<button onclick="updateStatus(' + point.id + ', \'found\')" style="background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Нашёл</button>' +
-                '<button onclick="updateStatus(' + point.id + ', \'not_found\')" style="background: #212121; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Не нашёл</button>' +
-                '<button onclick="updateStatus(' + point.id + ', \'rented\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Уехал в аренду</button>';
+            var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+            h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
+            h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
+            h += fzLink + commentHtml;
+            h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
+            h += '<button onclick="event.stopPropagation(); updateStatus(' + point.id + ', \'found\')" style="background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Нашёл</button>';
+            h += '<button onclick="event.stopPropagation(); updateStatus(' + point.id + ', \'not_found\')" style="background: #212121; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Не нашёл</button>';
+            h += '<button onclick="event.stopPropagation(); updateStatus(' + point.id + ', \'rented\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Уехал в аренду</button>';
             if (isBooked) {
-                h += '<button onclick="resetDeparture(' + point.id + ')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Выехал ' + departures[point.id].name + '</button>';
+                h += '<button onclick="event.stopPropagation(); resetDeparture(' + point.id + ')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Выехал ' + departures[point.id].name + '</button>';
             } else {
-                h += '<button onclick="showChoiceMenu(' + point.id + ', \'' + esc + '\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Забронировать</button>';
+                h += '<button onclick="event.stopPropagation(); showChoiceMenu(' + point.id + ', \'' + esc + '\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Забронировать</button>';
             }
-            return h + '</div></div>';
+            h += '</div></div>';
+            return h;
         }
 
         function updateStatus(pointId, status) {
@@ -609,22 +617,21 @@
             if (!pm) return;
             var point = pm.properties.get('pointData');
             var esc = pointTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;">' +
-                '<b style="font-size: 16px; display: block;">' + point.title + '</b>' +
-                '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>' +
-                '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>' +
-                '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">' +
-                '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>' +
-                '<button onclick="selectName(' + point.id + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>' +
-                '<button onclick="selectName(' + point.id + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>' +
-                '<button onclick="selectName(' + point.id + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>' +
-                '<button onclick="selectName(' + point.id + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>' +
-                '<button onclick="openCustomInputModal(' + point.id + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>' +
-                '</div></div>';
+            var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+            h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
+            h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
+            h += '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>';
+            h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
+            h += '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>';
+            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>';
+            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>';
+            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>';
+            h += '<button onclick="event.stopPropagation(); selectName(' + point.id + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>';
+            h += '<button onclick="event.stopPropagation(); openCustomInputModal(' + point.id + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>';
+            h += '</div></div>';
             pm.properties.set('balloonContent', h); pm.balloon.open();
         }
 
-        // ========== ПАРКОВКИ ==========
         function createParkingIcon() {
             return {
                 iconLayout: ymaps.templateLayoutFactory.createClass('<div style="width: 18px; height: 18px; text-align: center; line-height: 18px;"><img src="' + BASE_URL + 'p.png" style="width: 18px; height: 18px; display: block;"></div>'),
@@ -640,30 +647,68 @@
             });
         }
 
-        function createParkingLabels(lat, lon, available, dead, broken, pId) {
-            var availHtml = (appSettings.hide_empty_labels && available === '?') ? '' : '<div style="background: #4CAF50; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">В доступе: ' + available + '</div>';
-            var brokenHtml = (appSettings.hide_empty_labels && broken === '?') ? '' : '<div style="background: #7E0000; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">Поломки: ' + broken + '</div>';
-            var deadHtml = (appSettings.hide_empty_labels && dead === '?') ? '' : '<div style="background: #f44336; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">Севшие: ' + dead + '</div>';
+        function buildLabelsHtml(available, dead, broken) {
+            var items = [
+                { value: available, label: 'В доступе', color: '#4CAF50' },
+                { value: broken, label: 'Поломки', color: '#7E0000' },
+                { value: dead, label: 'Севшие', color: '#f44336' }
+            ];
             
-            if (appSettings.hide_empty_labels && availHtml === '' && deadHtml === '' && brokenHtml === '') return null;
+            items.sort(function(a, b) {
+                var aEmpty = (a.value === '?' || a.value === undefined || a.value === '');
+                var bEmpty = (b.value === '?' || b.value === undefined || b.value === '');
+                if (aEmpty && !bEmpty) return -1;
+                if (!aEmpty && bEmpty) return 1;
+                return 0;
+            });
+            
+            var html = '';
+            var hasVisible = false;
+            items.forEach(function(item) {
+                var isEmpty = (item.value === '?' || item.value === undefined || item.value === '');
+                if (appSettings.hide_empty_labels && isEmpty) return;
+                hasVisible = true;
+                html += '<div style="background: ' + item.color + '; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">' + item.label + ': ' + (item.value || '?') + '</div>';
+            });
+            
+            return hasVisible ? html : null;
+        }
 
-            var layout = ymaps.templateLayoutFactory.createClass('<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100px;">' + availHtml + brokenHtml + deadHtml + '</div>');
+        function createParkingLabels(lat, lon, available, dead, broken, pId) {
+            var html = buildLabelsHtml(available, dead, broken);
+            if (!html) return null;
+
+            var visibleCount = 0;
+            [available, broken, dead].forEach(function(v) {
+                var isEmpty = (v === '?' || v === undefined || v === '');
+                if (!(appSettings.hide_empty_labels && isEmpty)) visibleCount++;
+            });
+            
+            var offset = visibleCount * 17 + 5;
+
+            var layout = ymaps.templateLayoutFactory.createClass('<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100px;">' + html + '</div>');
             return new ymaps.Placemark([lat, lon], {}, {
-                iconLayout: layout, iconOffset: [-38, -55], iconShape: { type: 'Rectangle', coordinates: [[0, 0], [100, 52]] }
+                iconLayout: layout, iconOffset: [-41, -offset], iconShape: { type: 'Rectangle', coordinates: [[0, 0], [100, offset]] }
             });
         }
 
         function createOsmParkingLabels(available, dead, broken) {
-            var availHtml = (appSettings.hide_empty_labels && available === '?') ? '' : '<div style="background: #4CAF50; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">В доступе: ' + available + '</div>';
-            var brokenHtml = (appSettings.hide_empty_labels && broken === '?') ? '' : '<div style="background: #7E0000; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">Поломки: ' + broken + '</div>';
-            var deadHtml = (appSettings.hide_empty_labels && dead === '?') ? '' : '<div style="background: #f44336; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">Севшие: ' + dead + '</div>';
+            var html = buildLabelsHtml(available, dead, broken);
+            if (!html) return null;
+
+            var visibleCount = 0;
+            [available, broken, dead].forEach(function(v) {
+                var isEmpty = (v === '?' || v === undefined || v === '');
+                if (!(appSettings.hide_empty_labels && isEmpty)) visibleCount++;
+            });
             
-            if (appSettings.hide_empty_labels && availHtml === '' && deadHtml === '' && brokenHtml === '') return null;
+            var totalHeight = visibleCount * 17;
+            var extraOffset = 22;
 
             return L.divIcon({
                 className: 'custom-div-icon',
-                html: '<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100px;">' + availHtml + brokenHtml + deadHtml + '</div>',
-                iconSize: [100, 52], iconAnchor: [50, 52]
+                html: '<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100px;">' + html + '</div>',
+                iconSize: [100, totalHeight], iconAnchor: [51, totalHeight + extraOffset]
             });
         }
 
@@ -688,7 +733,8 @@
                             myMap.geoObjects.add(pm); parkingMarkers.push(pm);
 
                             var osmPm = L.marker([p.lat, p.lon], { icon: createOsmParkingIcon() }).addTo(osmMap);
-                            osmPm.bindPopup(buildParkingBalloon(p));
+                            var popup = L.popup({ closeOnClick: false, autoClose: false }).setContent(buildParkingBalloon(p));
+                            osmPm.bindPopup(popup);
                             osmPm.parkingData = p;
                             osmParkingMarkers.push(osmPm);
                         }
@@ -723,6 +769,19 @@
             }).then(function() { loadParkings(); });
         }
 
+        function resetParking(id) {
+            fetch(API_URL + '/update_parking', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, available: '?', dead: '?', broken: '?' })
+            }).then(function(r) { return r.json(); }).then(function(data) { 
+                if (data.success) {
+                    loadParkings();
+                    if (myMap) myMap.balloon.close();
+                    if (osmMap) osmMap.closePopup();
+                }
+            });
+        }
+
         function onDeadInfoClick() {
             deadClickCount++;
             if (deadClickTimer) clearTimeout(deadClickTimer);
@@ -746,32 +805,34 @@
             var photoHtml = p.photo_url ? '<a href="' + p.photo_url + '" target="_blank" style="color: #1976D2; text-decoration: underline; font-weight: bold; display: block; margin-top: 10px;">ФОТО ПАРКОВКИ</a>' : '';
             var btnText = appSettings.hide_empty_labels ? 'Вкл всё' : 'Выкл лишнее';
             var btnColor = appSettings.hide_empty_labels ? '#4CAF50' : '#f44336';
-            return '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;">' +
-                '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>' + photoHtml +
-                '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">' +
-                    '<div style="background: #4CAF50; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">В доступе: ' + p.available + '</div>' +
-                    '<div style="background: #7E0000; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">Поломки: ' + p.broken + '</div>' +
-                    '<div style="background: #f44336; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">Севшие: ' + p.dead + '</div>' +
-                    '<button onclick="startEditParking(' + p.id + ')" style="background: #9E9E9E; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Изменить</button>' +
-                    '<button onclick="toggleExtraVisibility()" style="background: ' + btnColor + '; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">' + btnText + '</button>' +
-                '</div></div>';
+            var h = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+            h += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>' + photoHtml;
+            h += '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">';
+            h += '<button onclick="event.stopPropagation(); resetParking(' + p.id + ')" style="background: #0080ff; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">ЗАРЯДИЛ</button>';
+            h += '<div style="background: #4CAF50; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">В доступе: ' + p.available + '</div>';
+            h += '<div style="background: #7E0000; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">Поломки: ' + p.broken + '</div>';
+            h += '<div style="background: #f44336; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">Севшие: ' + p.dead + '</div>';
+            h += '<button onclick="event.stopPropagation(); startEditParking(' + p.id + ')" style="background: #9E9E9E; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Изменить</button>';
+            h += '<button onclick="event.stopPropagation(); toggleExtraVisibility()" style="background: ' + btnColor + '; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">' + btnText + '</button>';
+            h += '</div></div>';
+            return h;
         }
 
         function startEditParking(id) {
             var pm = parkingMarkers.find(function(m) { var d = m.properties.get('parkingData'); return d && d.id === id; });
             if (!pm) return;
             var p = pm.properties.get('parkingData');
-            var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;">' +
-                '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>' +
-                '<div style="display: flex; flex-direction: column; gap: 10px;">' +
-                    '<div><button id="btn_avail_' + id + '" onclick="activateInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>' +
-                    '<input id="inp_avail_' + id + '" type="number" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>' +
-                    '<div><button id="btn_dead_' + id + '" onclick="activateInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>' +
-                    '<input id="inp_dead_' + id + '" type="number" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>' +
-                    '<div><button id="btn_broken_' + id + '" onclick="activateInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>' +
-                    '<input id="inp_broken_' + id + '" type="number" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>' +
-                    '<button onclick="saveParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>' +
-                '</div></div>';
+            var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
+            html += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>';
+            html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+            html += '<div><button id="btn_avail_' + id + '" onclick="event.stopPropagation(); activateInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>';
+            html += '<input id="inp_avail_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+            html += '<div><button id="btn_dead_' + id + '" onclick="event.stopPropagation(); activateInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>';
+            html += '<input id="inp_dead_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+            html += '<div><button id="btn_broken_' + id + '" onclick="event.stopPropagation(); activateInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>';
+            html += '<input id="inp_broken_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
+            html += '<button onclick="event.stopPropagation(); saveParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>';
+            html += '</div></div>';
             pm.properties.set('balloonContent', html); pm.balloon.open();
         }
 
@@ -822,7 +883,12 @@
                 } else if (mapMode === 2) {
                     document.getElementById('map').style.display = 'none';
                     document.getElementById('osmMap').style.display = 'block';
-                    setTimeout(function() { osmMap.invalidateSize(); }, 50);
+                    setTimeout(function() { 
+                        osmMap.invalidateSize();
+                        loadPoints();
+                        loadParkings();
+                        loadZones();
+                    }, 200);
                 }
             }
         }
