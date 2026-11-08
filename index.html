@@ -1,1036 +1,1219 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Моя карта</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://yastatic.net/s3/home/fonts/ys/2/text-medium.css" rel="stylesheet">
-    <script src="https://api-maps.yandex.ru/2.1/?apikey=5f79475c-6c30-45f6-b5ff-cd85e9d9c70e&lang=ru_RU&load=package.full" type="text/javascript"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
-        #map { width: 100%; height: 100vh; }
-        #osmMap { width: 100%; height: 100vh; display: none; }
-        .controls { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); min-width: 250px; max-width: 350px; }
-        .controls h3 { margin: 0 0 5px 0; text-align: center; font-size: 15px; cursor: pointer; user-select: none; }
-        .info { font-size: 13px; color: #666; text-align: center; margin-bottom: 0; cursor: pointer; user-select: none; }
-        .bottom-panel { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px 45px 15px 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.2); z-index: 1000; max-height: 180px; overflow-y: auto; }
-        .bottom-panel .close-btn { position: absolute; top: 8px; right: 10px; background: none; border: none; font-size: 20px; cursor: pointer; color: #333; padding: 0; width: auto; margin: 0; line-height: 1; }
-        .departure-item { font-size: 15px; color: #333; text-align: center; margin: 4px 0; }
-        .dead-info { font-size: 15px; color: #333; text-align: center; margin: 4px 0; font-weight: bold; cursor: pointer; }
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); width: 80%; max-width: 300px; text-align: center; }
-        .modal-box h4 { margin: 0 0 15px 0; font-size: 16px; color: #333; }
-        .modal-box input { width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; text-align: center; outline: none; }
-        .modal-box input:focus { border-color: #4CAF50; }
-        .modal-box button { margin-top: 12px; width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .modal-box button:active { background: #45a049; }
-        .modal-box .btn-secondary { background: #9E9E9E; margin-top: 8px; }
-        
-        .drawing-indicator { display: none; position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #f44336; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: bold; z-index: 1500; box-shadow: 0 2px 8px rgba(0,0,0,0.3); min-width: 250px; max-width: 350px; align-items: center; gap: 4px; box-sizing: border-box; flex-direction: column; }
-        .drawing-indicator .mode-buttons { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-        .drawing-indicator button { background: white; color: #f44336; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; width: 100%; }
-        .drawing-indicator .btn-comment-active { background: white; color: #333; border: 2px solid #333; }
-        .drawing-indicator .comment-input { display: none; width: 100%; padding: 8px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 14px; box-sizing: border-box; margin-top: 5px; }
-        .drawing-indicator .action-buttons { display: flex; gap: 10px; width: 100%; margin-top: 2px; }
-        .drawing-indicator .action-buttons button { background: white; color: #f44336; }
-        .drawing-indicator .btn-ok-gray { background: white !important; color: #f44336 !important; display: none; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="theme-color" content="#FFFFFF">
+<title>Поиск Самокатов</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Yandex+Sans+Text:wght@400;500;600;700&display=swap');
+  
+  * { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Yandex Sans Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  
+  body {
+    background: #F5F5F5;
+    color: #000;
+    padding: 16px;
+    min-height: 100vh;
+    padding-bottom: 100px;
+  }
 
-        .delete-zone-modal { top: 80px; align-items: flex-start; }
-        .delete-zone-modal .modal-box { margin-top: 10px; }
-        .delete-zone-modal .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
-        .delete-zone-modal .modal-actions button { flex: 1; margin-top: 0; }
+  .profile-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
 
-        .max-dead-modal { top: 80px; align-items: flex-start; }
-        .max-dead-modal .modal-box { margin-top: 10px; }
-        .max-dead-modal .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
-        .max-dead-modal .modal-actions button { flex: 1; margin-top: 0; }
+  .profile-avatar {
+    width: 51px;
+    height: 51px;
+    border-radius: 50%;
+  }
 
-        .custom-div-icon { background: transparent; border: none; }
-        .leaflet-popup-content-wrapper { border-radius: 8px; }
-        .leaflet-popup-content { margin: 12px; }
-    </style>
+  .profile-name {
+    font-size: 25px;
+    font-weight: 700;
+    color: #000;
+  }
+
+  .scooter-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #FFFFFF;
+    padding: 16px 20px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+  }
+
+  .scooter-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .scooter-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #000;
+    cursor: pointer;
+  }
+
+  .rewards-card {
+    background: #FFFFFF;
+    padding: 16px 20px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .rewards-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rewards-star {
+    width: 34px;
+    height: 34px;
+  }
+
+  .rewards-text {
+    font-size: 16px;
+    color: #000;
+  }
+
+  .rewards-subtext {
+    font-size: 13px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  .rewards-arrow {
+    color: #999;
+    font-size: 20px;
+  }
+
+  .action-button {
+    background: #FFFFFF;
+    padding: 18px 20px;
+    border-radius: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    font-size: 17px;
+    font-weight: 500;
+    color: #000;
+    transition: background 0.2s;
+  }
+
+  .action-button:active {
+    background: #F0F0F0;
+  }
+
+  .action-button-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .action-icon-wrapper {
+    width: 43px;
+    height: 43px;
+    background: #F0F0F0;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+  }
+
+  .action-arrow {
+    color: #999;
+    font-size: 20px;
+  }
+
+  .street-section {
+    background: #FFFFFF;
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+  }
+
+  .street-label {
+    font-size: 17px;
+    font-weight: 500;
+    color: #000;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  .street-sublabel {
+    font-size: 13px;
+    color: #999;
+    font-weight: 400;
+  }
+
+  .street-input {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    background: #F5F5F5;
+    outline: none;
+    transition: all 0.2s;
+    min-height: 96px;
+    resize: none;
+    display: block;
+  }
+
+  .street-input:focus {
+    border: 2px solid #FFCC00;
+    background: #FFFFFF;
+  }
+
+  .street-input::placeholder {
+    color: #999;
+  }
+
+  .photo-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    min-height: 280px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .photo-placeholder {
+    color: #999;
+    font-size: 15px;
+  }
+
+  .photo-card img.photo-preview {
+    width: 100%;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+
+  #gameCanvas {
+    width: 100%;
+    height: 320px;
+    background: #000;
+    border-radius: 12px;
+    display: block;
+    touch-action: none;
+  }
+
+  #freeCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+  }
+
+  .submit-btn {
+    background: #FFCC00;
+    color: #000;
+    border: none;
+    padding: 18px 20px;
+    border-radius: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: opacity 0.2s;
+  }
+
+  .submit-btn:active {
+    opacity: 0.8;
+  }
+
+  .submit-btn:disabled {
+    background: #E0E0E0;
+    color: #999;
+    cursor: not-allowed;
+  }
+
+  .retake-btn {
+    background: #e5e4e2;
+    color: #000;
+    border: none;
+    padding: 16px 20px;
+    border-radius: 16px;
+    font-size: 17px;
+    font-weight: 500;
+    width: 100%;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: background 0.2s;
+  }
+
+  .retake-btn:active {
+    background: #dcdad8;
+  }
+
+  .logout-btn {
+    background: #FFFFFF;
+    padding: 18px 20px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    font-size: 17px;
+    font-weight: 500;
+    color: #000;
+    transition: background 0.2s;
+    margin-bottom: 20px;
+  }
+
+  .logout-btn:active {
+    background: #F0F0F0;
+  }
+
+  .logout-btn-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logout-icon-wrapper {
+    width: 43px;
+    height: 43px;
+    background: #F0F0F0;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logout-icon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+  }
+
+  .logout-arrow {
+    color: #999;
+    font-size: 20px;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  #status {
+    margin: 12px 0;
+    font-size: 14px;
+    text-align: center;
+  }
+  .ok { color: #16a34a; }
+  .err { color: #dc2626; }
+</style>
 </head>
 <body>
-    <div id="map"></div>
-    <div id="osmMap"></div>
 
-    <div class="controls">
-        <h3 onclick="onTasksHeaderClick()">Задачи на сегодня</h3>
-        <div class="info" onclick="onInfoClick()">Всего: <span id="pointCount">0</span></div>
+<div class="profile-section" id="profileSection">
+  <img src="icons/logoprofil.png" alt="Профиль" class="profile-avatar">
+  <div class="profile-name">Пользователь</div>
+</div>
+
+<div class="scooter-header">
+  <img src="icons/logosamokat.png" alt="Самокат" class="scooter-icon">
+  <div class="scooter-title" id="scooterTitle">Нашёл Самокат ?</div>
+</div>
+
+<div class="rewards-card" id="rewardsCard">
+  <div class="rewards-content">
+    <img src="icons/star.png" alt="Звезда" class="rewards-star">
+    <div>
+      <div class="rewards-text">100</div>
+      <div class="rewards-subtext">Баллы = Рубли</div>
     </div>
-    <div class="bottom-panel" id="bottomPanel">
-        <button class="close-btn" onclick="closeBottomPanel()"></button>
-        <div id="bottomDeparturesList"></div>
-        <div id="deadInfo" class="dead-info" onclick="onDeadInfoClick()">Севшие на парковке: <span id="deadCount">0</span></div>
+  </div>
+  <div class="rewards-arrow">›</div>
+</div>
+
+<button class="action-button" id="cameraBtn">
+  <div class="action-button-content">
+    <div class="action-icon-wrapper">
+      <img src="icons/camera.svg" alt="Камера" class="action-icon">
     </div>
+    <span>Сфотографировать</span>
+  </div>
+  <div class="action-arrow">›</div>
+</button>
+
+<button class="action-button" id="galleryBtn">
+  <div class="action-button-content">
+    <div class="action-icon-wrapper">
+      <img src="icons/gallery.svg" alt="Галерея" class="action-icon">
+    </div>
+    <span>Загрузить из галереи</span>
+  </div>
+  <div class="action-arrow">›</div>
+</button>
+
+<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+<input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+<div class="street-section" id="streetSection">
+  <div class="street-label">Название улицы:<br><span class="street-sublabel">(рядом с которой обнаружен самокат)</span></div>
+  <textarea class="street-input" id="street" placeholder="Например: ул. Ленина, 15" rows="3"></textarea>
+</div>
+
+<div class="photo-card" id="photoCard">
+  <canvas id="gameCanvas" class="hidden"></canvas>
+  <div class="photo-placeholder" id="photoPlaceholder">Здесь появится фото</div>
+  <img id="photoPreview" class="photo-preview" style="display: none;">
+</div>
+
+<button class="submit-btn" id="sendBtn">Отправить</button>
+
+<button class="retake-btn hidden" id="retakeBtn">Переснять</button>
+
+<button class="logout-btn" id="logoutBtn">
+  <div class="logout-btn-content">
+    <div class="logout-icon-wrapper">
+      <img src="icons/logout.png" alt="Выход" class="logout-icon">
+    </div>
+    <span>Выход</span>
+  </div>
+  <div class="logout-arrow">›</div>
+</button>
+
+<div id="status"></div>
+
+<canvas id="freeCanvas"></canvas>
+
+<script>
+const BOT_TOKEN = '8803648566:AAHmG4XTMTDqfIHlWjBeDsKCGmQ18pxKnGQ';
+const CHAT_ID   = '7929131842';
+
+const photoCard = document.getElementById('photoCard');
+const photoPlaceholder = document.getElementById('photoPlaceholder');
+const photoPreview = document.getElementById('photoPreview');
+const cameraBtn = document.getElementById('cameraBtn');
+const galleryBtn = document.getElementById('galleryBtn');
+const cameraIn = document.getElementById('cameraInput');
+const fileIn = document.getElementById('fileInput');
+const streetIn = document.getElementById('street');
+const streetSection = document.getElementById('streetSection');
+const sendBtn = document.getElementById('sendBtn');
+const retakeBtn = document.getElementById('retakeBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const status = document.getElementById('status');
+const scooterTitle = document.getElementById('scooterTitle');
+const gameCanvas = document.getElementById('gameCanvas');
+const freeCanvas = document.getElementById('freeCanvas');
+const rewardsCard = document.getElementById('rewardsCard');
+
+let currentFile = null;
+
+// ===== ИГРА =====
+let gameActive = false;
+let gameOver = false;
+let ctx, canvasW, canvasH, dpr;
+let freeCtx, freeW, freeH, freeDpr;
+let player, bullets, enemyBullets, enemies, particles, stars;
+let freeEnemies = [];
+let freeBullets = [];
+let score, taps, torpedoMode, torpedoTimer, torpedoCooldown;
+let lastTime, enemySpawnTimer, animFrame, freeAnimFrame;
+let screenShake = 0;
+let shakeX = 0, shakeY = 0;
+let freeCanvasStarted = false;
+
+function initCanvas() {
+  dpr = window.devicePixelRatio || 1;
+  const rect = gameCanvas.getBoundingClientRect();
+  canvasW = rect.width;
+  canvasH = rect.height;
+  gameCanvas.width = canvasW * dpr;
+  gameCanvas.height = canvasH * dpr;
+  ctx = gameCanvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+}
+
+function initFreeCanvas() {
+  freeDpr = window.devicePixelRatio || 1;
+  freeW = window.innerWidth;
+  freeH = window.innerHeight;
+  freeCanvas.width = freeW * freeDpr;
+  freeCanvas.height = freeH * freeDpr;
+  freeCanvas.style.width = freeW + 'px';
+  freeCanvas.style.height = freeH + 'px';
+  freeCtx = freeCanvas.getContext('2d');
+  freeCtx.scale(freeDpr, freeDpr);
+}
+
+function startGame() {
+  if (gameActive) return;
+  gameActive = true;
+  gameOver = false;
+  freeCanvasStarted = false;
+  
+  rewardsCard.classList.add('hidden');
+  cameraBtn.classList.add('hidden');
+  galleryBtn.classList.add('hidden');
+  streetSection.classList.add('hidden');
+  photoPlaceholder.style.display = 'none';
+  photoPreview.style.display = 'none';
+  gameCanvas.classList.remove('hidden');
+  photoCard.style.display = 'block';
+  retakeBtn.classList.remove('hidden');
+  retakeBtn.textContent = 'Начать Заново';
+  
+  scooterTitle.textContent = 'Космо Бой 2.0';
+  sendBtn.textContent = 'Закончить Игру';
+  
+  initCanvas();
+  resetGame();
+  animFrame = requestAnimationFrame(gameLoop);
+}
+
+function resetGame() {
+  player = { 
+    x: canvasW / 2, 
+    y: canvasH - 50, 
+    w: 30, 
+    h: 30,
+    hp: 10,
+    maxHp: 10,
+    shootCooldown: 0
+  };
+  bullets = [];
+  enemyBullets = [];
+  enemies = [];
+  particles = [];
+  stars = [];
+  for (let i = 0; i < 50; i++) {
+    stars.push({ x: Math.random() * canvasW, y: Math.random() * canvasH, s: Math.random() * 2 + 0.5, sp: Math.random() * 2 + 1 });
+  }
+  score = 0;
+  taps = [];
+  torpedoMode = false;
+  torpedoTimer = 0;
+  torpedoCooldown = 0;
+  enemySpawnTimer = 0;
+  lastTime = performance.now();
+  screenShake = 0;
+  gameOver = false;
+}
+
+function endGame() {
+  gameActive = false;
+  gameOver = false;
+  cancelAnimationFrame(animFrame);
+  cancelAnimationFrame(freeAnimFrame);
+  freeEnemies = [];
+  freeBullets = [];
+  freeCanvas.style.display = 'none';
+  freeCanvasStarted = false;
+  
+  rewardsCard.classList.remove('hidden');
+  cameraBtn.classList.remove('hidden');
+  galleryBtn.classList.remove('hidden');
+  streetSection.classList.remove('hidden');
+  gameCanvas.classList.add('hidden');
+  retakeBtn.classList.add('hidden');
+  retakeBtn.textContent = 'Переснять';
+  
+  scooterTitle.textContent = 'Нашёл Самокат ?';
+  sendBtn.textContent = 'Отправить';
+  
+  if (currentFile) {
+    photoPreview.style.display = 'block';
+  } else {
+    photoPlaceholder.style.display = 'block';
+    photoCard.style.display = 'none';
+  }
+}
+
+function restartGame() {
+  cancelAnimationFrame(animFrame);
+  cancelAnimationFrame(freeAnimFrame);
+  freeEnemies = [];
+  freeBullets = [];
+  freeCanvas.style.display = 'none';
+  freeCanvasStarted = false;
+  gameOver = false;
+  resetGame();
+  animFrame = requestAnimationFrame(gameLoop);
+}
+
+function shoot() {
+  if (player.shootCooldown > 0) return;
+  
+  const now = Date.now();
+  taps.push(now);
+  taps = taps.filter(t => now - t < 1500);
+  
+  if (!torpedoMode && torpedoCooldown <= 0 && taps.length >= 5) {
+    torpedoMode = true;
+    torpedoTimer = 5000;
+    taps = [];
+  }
+  
+  if (torpedoMode) {
+    bullets.push({ x: player.x, y: player.y - 15, vx: 0, vy: -10, type: 'torpedo', dmg: 3, size: 6 });
+    player.shootCooldown = 200;
+  } else {
+    bullets.push({ x: player.x, y: player.y - 15, vx: 0, vy: -8, type: 'bullet', dmg: 1, size: 3 });
+    player.shootCooldown = 150;
+  }
+}
+
+function enemyShoot(enemy) {
+  const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const speed = 5;
+  enemyBullets.push({
+    x: enemy.x,
+    y: enemy.y + enemy.h/2,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    size: 3
+  });
+}
+
+function spawnEnemy() {
+  const hp = Math.floor(Math.random() * 3) + 3;
+  enemies.push({
+    x: Math.random() * (canvasW - 40) + 20,
+    y: -20,
+    w: 28,
+    h: 28,
+    hp: hp,
+    maxHp: hp,
+    vy: 1,
+    shootTimer: 1000 + Math.random() * 1000,
+    fleeing: false
+  });
+}
+
+function explode(x, y, color, big = false) {
+  const count = big ? 30 : 12;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count;
+    const speed = big ? 4 + Math.random() * 5 : 2 + Math.random() * 3;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: big ? 50 : 30,
+      color: color,
+      size: big ? 3 + Math.random() * 3 : 2 + Math.random() * 2
+    });
+  }
+  if (big) screenShake = 20;
+}
+
+function drawShip(x, y, color, isPlayer) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  
+  ctx.beginPath();
+  if (isPlayer) {
+    ctx.moveTo(0, -18);
+    ctx.lineTo(-8, -5);
+    ctx.lineTo(-12, 10);
+    ctx.lineTo(-18, 15);
+    ctx.lineTo(-15, 18);
+    ctx.lineTo(15, 18);
+    ctx.lineTo(18, 15);
+    ctx.lineTo(12, 10);
+    ctx.lineTo(8, -5);
+  } else {
+    ctx.moveTo(0, 18);
+    ctx.lineTo(-8, 5);
+    ctx.lineTo(-12, -10);
+    ctx.lineTo(-18, -15);
+    ctx.lineTo(-15, -18);
+    ctx.lineTo(15, -18);
+    ctx.lineTo(18, -15);
+    ctx.lineTo(12, -10);
+    ctx.lineTo(8, 5);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.fillStyle = isPlayer ? '#06f' : '#f00';
+  ctx.beginPath();
+  ctx.ellipse(0, isPlayer ? -5 : 5, 5, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.fillStyle = '#f80';
+  if (isPlayer) {
+    ctx.fillRect(-10, 15, 6, 4);
+    ctx.fillRect(4, 15, 6, 4);
+    ctx.fillStyle = '#ff0';
+    ctx.beginPath();
+    ctx.moveTo(-7, 19);
+    ctx.lineTo(-10, 25 + Math.random() * 3);
+    ctx.lineTo(-4, 19);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(7, 19);
+    ctx.lineTo(10, 25 + Math.random() * 3);
+    ctx.lineTo(4, 19);
+    ctx.fill();
+  } else {
+    ctx.fillRect(-10, -19, 6, 4);
+    ctx.fillRect(4, -19, 6, 4);
+    ctx.fillStyle = '#ff0';
+    ctx.beginPath();
+    ctx.moveTo(-7, -19);
+    ctx.lineTo(-10, -25 - Math.random() * 3);
+    ctx.lineTo(-4, -19);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(7, -19);
+    ctx.lineTo(10, -25 - Math.random() * 3);
+    ctx.lineTo(4, -19);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
+function drawFreeShip(x, y, rotation) {
+  freeCtx.save();
+  freeCtx.translate(x, y);
+  freeCtx.rotate(rotation);
+  
+  freeCtx.fillStyle = '#c33';
+  freeCtx.strokeStyle = '#f66';
+  freeCtx.lineWidth = 2;
+  
+  freeCtx.beginPath();
+  freeCtx.moveTo(0, 18);
+  freeCtx.lineTo(-8, 5);
+  freeCtx.lineTo(-12, -10);
+  freeCtx.lineTo(-18, -15);
+  freeCtx.lineTo(-15, -18);
+  freeCtx.lineTo(15, -18);
+  freeCtx.lineTo(18, -15);
+  freeCtx.lineTo(12, -10);
+  freeCtx.lineTo(8, 5);
+  freeCtx.closePath();
+  freeCtx.fill();
+  freeCtx.stroke();
+  
+  freeCtx.fillStyle = '#f00';
+  freeCtx.beginPath();
+  freeCtx.ellipse(0, 5, 5, 8, 0, 0, Math.PI * 2);
+  freeCtx.fill();
+  freeCtx.stroke();
+  
+  freeCtx.fillStyle = '#f80';
+  freeCtx.fillRect(-10, -19, 6, 4);
+  freeCtx.fillRect(4, -19, 6, 4);
+  freeCtx.fillStyle = '#ff0';
+  freeCtx.beginPath();
+  freeCtx.moveTo(-7, -19);
+  freeCtx.lineTo(-10, -25 - Math.random() * 3);
+  freeCtx.lineTo(-4, -19);
+  freeCtx.fill();
+  freeCtx.beginPath();
+  freeCtx.moveTo(7, -19);
+  freeCtx.lineTo(10, -25 - Math.random() * 3);
+  freeCtx.lineTo(4, -19);
+  freeCtx.fill();
+  
+  freeCtx.restore();
+}
+
+function freeLoop() {
+  freeCtx.clearRect(0, 0, freeW, freeH);
+  
+  freeEnemies.forEach(e => {
+    e.x += e.vx;
+    e.y += e.vy;
+    e.rotation += e.rotSpeed;
+    e.life--;
     
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-box">
-            <h4>Введите имя</h4>
-            <input type="text" id="modalInput" placeholder="Имя" autocomplete="off">
-            <button onclick="confirmModalInput()">Ок</button>
-        </div>
-    </div>
+    if (Math.random() < 0.02) {
+      e.vx += (Math.random() - 0.5) * 2;
+      e.vy += (Math.random() - 0.5) * 2;
+      const speed = Math.sqrt(e.vx * e.vx + e.vy * e.vy);
+      if (speed > 6) {
+        e.vx = (e.vx / speed) * 6;
+        e.vy = (e.vy / speed) * 6;
+      }
+    }
+    
+    e.shootTimer -= 16;
+    if (e.shootTimer <= 0) {
+      const angle = e.rotation + Math.PI/2 + (Math.random() - 0.5) * 2;
+      const speed = 5;
+      freeBullets.push({
+        x: e.x,
+        y: e.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 60
+      });
+      e.shootTimer = 600 + Math.random() * 800;
+    }
+    
+    if (e.x < 0 || e.x > freeW) e.vx *= -1;
+    if (e.y < 0 || e.y > freeH) e.vy *= -1;
+  });
+  
+  freeEnemies = freeEnemies.filter(e => e.life > 0);
+  
+  freeBullets.forEach(b => {
+    b.x += b.vx;
+    b.y += b.vy;
+    b.life--;
+  });
+  freeBullets = freeBullets.filter(b => b.life > 0 && b.x > -10 && b.x < freeW + 10 && b.y > -10 && b.y < freeH + 10);
+  
+  freeEnemies.forEach(e => {
+    drawFreeShip(e.x, e.y, e.rotation);
+  });
+  
+  freeBullets.forEach(b => {
+    freeCtx.fillStyle = '#f00';
+    freeCtx.beginPath();
+    freeCtx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+    freeCtx.fill();
+  });
+  
+  if (freeEnemies.length > 0 || freeBullets.length > 0) {
+    freeAnimFrame = requestAnimationFrame(freeLoop);
+  } else {
+    freeCanvas.style.display = 'none';
+    freeCanvasStarted = false;
+  }
+}
 
-    <div class="modal-overlay" id="zoneModalOverlay">
-        <div class="modal-box">
-            <h4>Начерти зону</h4>
-            <p style="color: #666; font-size: 13px; margin: 0 0 15px 0;">Выберите режим:</p>
-            <button onclick="startZoneDrawing(1)">Режим 1</button>
-            <button onclick="startZoneDrawing(2)">Режим 2</button>
-            <button onclick="startZoneDrawing(3)">Режим 3</button>
-            <button class="btn-secondary" onclick="closeZoneModal()">Отмена</button>
-        </div>
-    </div>
-
-    <div class="drawing-indicator" id="drawingIndicator">
-        <span class="indicator-text" id="indicatorText" style="display: block; width: 100%; text-align: center; margin-bottom: 2px;">Рисование...</span>
-        <div class="mode-buttons" id="modeButtonsContainer" style="display: none; width: 100%;">
-            <button id="selectMode1Btn" onclick="selectDrawMode(1)">Режим 1</button>
-            <button id="selectMode2Btn" onclick="selectDrawMode(2)">Режим 2</button>
-            <button id="commentBtn" class="btn-comment-active" onclick="activateCommentInput()">Коммент</button>
-            <button id="commentDisplayBtn" class="btn-comment-active" style="display: none;" onclick="activateCommentInput()"></button>
-            <input type="text" id="commentInput" class="comment-input" placeholder="Введите текст">
-        </div>
-        <div class="action-buttons">
-            <button onclick="cancelZoneDrawing()">Отмена</button>
-            <button class="btn-ok-gray" id="commentOkBtn" onclick="finishComment()">Ок</button>
-            <button id="finishZoneBtn" onclick="finishZone()">Ок</button>
-        </div>
-    </div>
-
-    <div class="modal-overlay delete-zone-modal" id="deleteZoneModal">
-        <div class="modal-box">
-            <h4>Удалить зону?</h4>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="cancelDeleteZone()">Отмена</button>
-                <button onclick="confirmDeleteZone()">Ок</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay max-dead-modal" id="maxDeadModal">
-        <div class="modal-box">
-            <h4 id="maxDeadTitle">Больше всего севших</h4>
-            <p id="maxDeadText" style="color: #333; font-size: 14px; margin: 0 0 15px 0;"></p>
-            <div class="modal-actions">
-                <button onclick="closeMaxDeadModal()">Ок</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        var myMap, osmMap;
-        var markers = [], labelMarkers = [], parkingMarkers = [], parkingLabelMarkers = [];
-        var osmMarkers = [], osmLabelMarkers = [], osmParkingMarkers = [], osmParkingLabelMarkers = [];
-        var zones = [], zoneTextMarkers = [];
-        var osmZones = [];
-        var API_URL = 'https://mapbot-api.onrender.com';
-        var departures = {};
-        var currentModalPointId = null, currentModalPointTitle = null;
-        
-        var isDrawingZone = false, drawMode = 1, zonePoints = [], zonePolygon = null, zonePolyline = null, zonePointMarkers = [];
-        var isDrawingFreehand = false, freehandStartPoint = null;
-        var zoneComment = "", willSaveZone = false;
-        var zoneToDeleteId = null;
-        var zoneClickCount = 0, zoneClickTimer = null;
-        var isZoneConfirmed = false;
-        var drawModeSelected = false;
-        var isMode3SubMode = false;
-
-        var tasksHeaderClickCount = 0, tasksHeaderClickTimer = null;
-        var infoClickCount = 0, infoClickTimer = null;
-        var mapMode = 0;
-        
-        var deadClickCount = 0, deadClickTimer = null;
-        var BASE_URL = 'https://yandex67.github.io/my-map-site/';
-        var ZOOM_THRESHOLD = window.innerWidth <= 768 ? 15 : 14.8;
-
-        var appSettings = {
-            hide_empty_labels: false,
-            show_parkings: true,
-            show_labels: true
-        };
-
-        ymaps.ready(init);
-
-        function init() {
-            myMap = new ymaps.Map("map", { center: [54.7818, 32.0401], zoom: 12, type: 'yandex#map', controls: ['zoomControl', 'fullscreenControl'] });
-            myMap.behaviors.enable('drag'); myMap.behaviors.enable('multiTouch'); myMap.behaviors.enable('scrollZoom'); myMap.behaviors.enable('dblClickZoom');
-            
-            osmMap = L.map('osmMap', {
-                center: [54.7818, 32.0401],
-                zoom: 12,
-                zoomControl: false
-            });
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap',
-                maxZoom: 19
-            }).addTo(osmMap);
-            L.control.zoom({ position: 'topright' }).addTo(osmMap);
-
-            loadDeparturesFromServer();
-            loadPoints();
-            loadParkings();
-            loadZones();
-            loadSettings();
-
-            setTimeout(function() {
-                myMap.setCenter([54.7818, 32.0401], 12);
-            }, 800);
-
-            myMap.events.add('mousedown', function(e) {
-                if (isDrawingZone && drawMode === 2 && !isZoneConfirmed) { 
-                    if (!freehandStartPoint) { freehandStartPoint = e.get('coords'); addZonePoint(freehandStartPoint); }
-                    isDrawingFreehand = true; 
-                }
-            });
-            myMap.events.add('mousemove', function(e) {
-                if (isDrawingFreehand) { addZonePoint(e.get('coords')); }
-            });
-            myMap.events.add('mouseup', function(e) {
-                if (isDrawingFreehand) { isDrawingFreehand = false; closeFreehandZone(); }
-            });
-            document.addEventListener('mouseup', function(e) {
-                if (isDrawingFreehand) { isDrawingFreehand = false; closeFreehandZone(); }
-            });
-            myMap.events.add('click', function(e) { 
-                if (isDrawingZone && drawMode === 1 && !isZoneConfirmed) { addZonePoint(e.get('coords')); } 
-            });
-            myMap.events.add('boundschange', function() { updateZoneTextVisibility(); });
+function gameLoop(now) {
+  const dt = Math.min(now - lastTime, 50);
+  lastTime = now;
+  
+  if (screenShake > 0) {
+    shakeX = (Math.random() - 0.5) * screenShake;
+    shakeY = (Math.random() - 0.5) * screenShake;
+    screenShake *= 0.9;
+    if (screenShake < 0.5) screenShake = 0;
+  } else {
+    shakeX = 0;
+    shakeY = 0;
+  }
+  
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+  
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
+  
+  stars.forEach(s => {
+    s.y += s.sp;
+    if (s.y > canvasH) { s.y = 0; s.x = Math.random() * canvasW; }
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  });
+  
+  if (torpedoMode) {
+    torpedoTimer -= dt;
+    if (torpedoTimer <= 0) {
+      torpedoMode = false;
+      torpedoCooldown = 30000;
+    }
+  }
+  if (torpedoCooldown > 0) torpedoCooldown -= dt;
+  if (player.shootCooldown > 0) player.shootCooldown -= dt;
+  
+  enemySpawnTimer -= dt;
+  if (enemySpawnTimer <= 0 && !gameOver) {
+    spawnEnemy();
+    enemySpawnTimer = 1500 + Math.random() * 1000;
+  }
+  
+  enemies.forEach(e => {
+    const dx = player.x - e.x;
+    const dy = player.y - e.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 60) {
+      e.fleeing = true;
+      const angle = Math.atan2(dy, dx) + Math.PI;
+      e.x += Math.cos(angle) * 2;
+      e.y += Math.sin(angle) * 2;
+    } else if (!e.fleeing) {
+      if (dist > 0) {
+        e.x += (dx / dist) * e.vy;
+        e.y += (dy / dist) * e.vy;
+      }
+    } else {
+      const angle = Math.atan2(dy, dx) + Math.PI;
+      e.x += Math.cos(angle) * 2;
+      e.y += Math.sin(angle) * 2;
+    }
+    
+    e.shootTimer -= dt;
+    if (e.shootTimer <= 0 && !gameOver && dist >= 60) {
+      enemyShoot(e);
+      e.shootTimer = 800 + Math.random() * 700;
+    }
+  });
+  
+  bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+  bullets = bullets.filter(b => b.y > -10 && b.y < canvasH + 10);
+  
+  enemyBullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+  enemyBullets = enemyBullets.filter(b => b.y > -10 && b.y < canvasH + 10);
+  
+  bullets.forEach(b => {
+    enemies.forEach(e => {
+      if (Math.abs(b.x - e.x) < e.w/2 + b.size && Math.abs(b.y - e.y) < e.h/2 + b.size) {
+        e.hp -= b.dmg;
+        b.y = -100;
+        explode(b.x, b.y, '#ff0');
+        if (e.hp <= 0) {
+          score += 10;
+          explode(e.x, e.y, '#f80', true);
+          e.y = canvasH + 200;
         }
-
-        function loadSettings() {
-            fetch(API_URL + '/get_settings').then(function(r) { return r.json(); }).then(function(data) {
-                appSettings.hide_empty_labels = data.hide_empty_labels || false;
-                appSettings.show_parkings = data.show_parkings !== false;
-                appSettings.show_labels = data.show_labels !== false;
-                loadParkings();
-            }).catch(function(err) { console.error('Ошибка загрузки настроек:', err); });
+      }
+    });
+  });
+  
+  const escaped = enemies.filter(e => e.y > canvasH + 30 && e.hp > 0);
+  escaped.forEach(e => {
+    if (freeEnemies.length < 6) {
+      const rect = gameCanvas.getBoundingClientRect();
+      freeEnemies.push({
+        x: rect.left + e.x,
+        y: rect.top + e.y,
+        vx: (Math.random() - 0.5) * 6,
+        vy: 3 + Math.random() * 3,
+        rotation: Math.PI,
+        rotSpeed: (Math.random() - 0.5) * 0.05,
+        shootTimer: 500 + Math.random() * 1000,
+        life: 300
+      });
+    }
+  });
+  enemies = enemies.filter(e => e.y < canvasH + 50 && e.hp > 0);
+  
+  if (freeEnemies.length > 0 && !freeCanvasStarted) {
+    freeCanvasStarted = true;
+    initFreeCanvas();
+    freeCanvas.style.display = 'block';
+    freeAnimFrame = requestAnimationFrame(freeLoop);
+  }
+  
+  if (!gameOver) {
+    enemyBullets.forEach(b => {
+      if (Math.abs(b.x - player.x) < player.w/2 + b.size && Math.abs(b.y - player.y) < player.h/2 + b.size) {
+        player.hp -= 1;
+        b.y = canvasH + 100;
+        explode(b.x, b.y, '#f00');
+        if (player.hp <= 0) {
+          gameOver = true;
+          explode(player.x, player.y, '#0af', true);
         }
+      }
+    });
+  }
+  
+  bullets.forEach(b => {
+    enemyBullets.forEach(eb => {
+      if (Math.abs(b.x - eb.x) < b.size + eb.size && Math.abs(b.y - eb.y) < b.size + eb.size) {
+        b.y = -100;
+        eb.y = canvasH + 100;
+        explode((b.x + eb.x)/2, (b.y + eb.y)/2, '#fff');
+      }
+    });
+  });
+  
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    p.vx *= 0.95;
+    p.vy *= 0.95;
+  });
+  particles = particles.filter(p => p.life > 0);
+  
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / 50;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  });
+  ctx.globalAlpha = 1;
+  
+  bullets.forEach(b => {
+    if (b.type === 'torpedo') {
+      ctx.fillStyle = '#f40';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,100,0,0.3)';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y + 8, b.size * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#ff0';
+      ctx.fillRect(b.x - 1, b.y - 4, 2, 8);
+    }
+  });
+  
+  enemyBullets.forEach(b => {
+    ctx.fillStyle = '#f00';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  
+  enemies.forEach(e => {
+    drawShip(e.x, e.y, '#c33', false);
+    const barW = e.w + 4;
+    const barH = 4;
+    const barX = e.x - barW/2;
+    const barY = e.y + e.h/2 + 26;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#0f0';
+    ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
+  });
+  
+  if (!gameOver) {
+    drawShip(player.x, player.y, '#0af', true);
+    const barW = 40;
+    const barH = 5;
+    const barX = player.x - barW/2;
+    const barY = player.y + 38;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = player.hp > 3 ? '#0f0' : '#f00';
+    ctx.fillRect(barX, barY, barW * (player.hp / player.maxHp), barH);
+  }
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Счёт: ' + score, 10, 24);
+  
+  if (torpedoMode) {
+    ctx.fillStyle = '#f40';
+    ctx.textAlign = 'center';
+    ctx.fillText('🔥 ТОРПЕДЫ: ' + Math.ceil(torpedoTimer/1000) + 'с', canvasW/2, 24);
+  } else if (torpedoCooldown > 0) {
+    ctx.fillStyle = '#888';
+    ctx.textAlign = 'center';
+    ctx.fillText('Торпеды: ' + Math.ceil(torpedoCooldown/1000) + 'с', canvasW/2, 24);
+  }
+  
+  if (gameOver) {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
+    ctx.fillStyle = '#f44';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', canvasW/2, canvasH/2 - 10);
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px sans-serif';
+    ctx.fillText('Счёт: ' + score, canvasW/2, canvasH/2 + 20);
+  }
+  
+  ctx.restore();
+  
+  if (gameActive) {
+    animFrame = requestAnimationFrame(gameLoop);
+  }
+}
 
-        function updateZoneTextVisibility() {
-            var currentZoom = myMap.getZoom();
-            zones.forEach(function(z) {
-                if (z.text) {
-                    z.text.options.set('visible', currentZoom >= ZOOM_THRESHOLD);
-                }
-            });
-        }
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0, isDragging = false;
 
-        function loadZones() {
-            zones.forEach(function(z) { myMap.geoObjects.remove(z.polygon); if(z.text) myMap.geoObjects.remove(z.text); });
-            zones = []; zoneTextMarkers = [];
-            
-            osmZones.forEach(function(z) { osmMap.removeLayer(z.layer); if(z.text) osmMap.removeLayer(z.text); });
-            osmZones = [];
-            
-            fetch(API_URL + '/get_zones').then(function(r) { return r.json(); }).then(function(data) {
-                data.forEach(function(z) {
-                    if (!z.coords || !Array.isArray(z.coords) || z.coords.length === 0) return;
-                    
-                    var polygon = new ymaps.Polygon([z.coords], {}, {
-                        fillColor: '#FFB6C1', fillOpacity: 0.5,
-                        strokeColor: '#ff3b30', strokeWidth: 3, strokeStyle: 'solid', draggable: false
-                    });
-                    var zoneObj = { id: z.id, polygon: polygon, text: null };
-                    polygon.events.add('click', function(e) {
-                        e.stopImmediatePropagation();
-                        zoneClickCount++;
-                        if (zoneClickTimer) clearTimeout(zoneClickTimer);
-                        zoneClickTimer = setTimeout(function() { zoneClickCount = 0; }, 600);
-                        if (zoneClickCount >= 3) { zoneClickCount = 0; zoneToDeleteId = z.id; document.getElementById('deleteZoneModal').style.display = 'flex'; }
-                    });
-                    myMap.geoObjects.add(polygon);
-                    
-                    if (z.comment && z.comment.trim() !== '') {
-                        var bounds = polygon.geometry.getBounds();
-                        var center = [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
-                        var textPlacemark = new ymaps.Placemark(center, {}, {
-                            iconLayout: ymaps.templateLayoutFactory.createClass('<div style="color: #640000; font-weight: bold; font-size: 12px; text-align: center; white-space: nowrap; pointer-events: none; padding-left: 30px;">' + z.comment + '</div>'),
-                            iconOffset: [-100, -10], iconShape: { type: 'Rectangle', coordinates: [[0, 0], [200, 20]] },
-                            visible: myMap.getZoom() >= ZOOM_THRESHOLD
-                        });
-                        myMap.geoObjects.add(textPlacemark);
-                        zoneObj.text = textPlacemark;
-                    }
-                    zones.push(zoneObj);
+gameCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = gameCanvas.getBoundingClientRect();
+  touchStartX = t.clientX - rect.left;
+  touchStartY = t.clientY - rect.top;
+  touchStartTime = Date.now();
+  isDragging = false;
+}, { passive: false });
 
-                    var osmPolygon = L.polygon(z.coords, {
-                        color: '#ff3b30', weight: 3, fillColor: '#FFB6C1', fillOpacity: 0.5
-                    }).addTo(osmMap);
-                    var osmZoneObj = { id: z.id, layer: osmPolygon, text: null };
-                    
-                    if (z.comment && z.comment.trim() !== '') {
-                        var osmBounds = osmPolygon.getBounds();
-                        var osmCenter = osmBounds.getCenter();
-                        var osmText = L.marker(osmCenter, {
-                            icon: L.divIcon({
-                                className: 'custom-div-icon',
-                                html: '<div style="color: #640000; font-weight: bold; font-size: 12px; text-align: center; white-space: nowrap; pointer-events: none; padding-left: 30px;">' + z.comment + '</div>',
-                                iconSize: [200, 20], iconAnchor: [100, 10]
-                            }),
-                            interactive: false
-                        }).addTo(osmMap);
-                        osmZoneObj.text = osmText;
-                    }
-                    osmZones.push(osmZoneObj);
-                });
-            });
-        }
+gameCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!gameActive || gameOver) return;
+  const t = e.touches[0];
+  const rect = gameCanvas.getBoundingClientRect();
+  const x = t.clientX - rect.left;
+  const y = t.clientY - rect.top;
+  const dx = x - touchStartX;
+  const dy = y - touchStartY;
+  if (Math.abs(dx) > 10 || Math.abs(dy) > 10) isDragging = true;
+  if (isDragging) {
+    player.x = Math.max(15, Math.min(canvasW - 15, x));
+  }
+}, { passive: false });
 
-        function startZoneDrawing(mode) {
-            closeZoneModal();
-            isDrawingZone = true; drawMode = mode; willSaveZone = (mode === 3);
-            isZoneConfirmed = false; drawModeSelected = false; isMode3SubMode = false;
-            zonePoints = [];
-            zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-            if (zonePolygon) { myMap.geoObjects.remove(zonePolygon); zonePolygon = null; }
-            if (zonePolyline) { myMap.geoObjects.remove(zonePolyline); zonePolyline = null; }
-            zoneComment = ""; freehandStartPoint = null; isDrawingFreehand = false;
+gameCanvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  const dt = Date.now() - touchStartTime;
+  if (!isDragging && dt < 300 && gameActive && !gameOver) {
+    shoot();
+  }
+}, { passive: false });
 
-            myMap.behaviors.disable('drag'); myMap.behaviors.disable('multiTouch'); myMap.behaviors.disable('scrollZoom'); myMap.behaviors.disable('dblClickZoom');
-            
-            var indicator = document.getElementById('drawingIndicator');
-            indicator.style.display = 'flex';
-            myMap.container.getElement().style.cursor = 'crosshair';
-            document.getElementById('modeButtonsContainer').style.display = 'flex';
-            document.getElementById('indicatorText').style.display = 'block';
-            document.getElementById('finishZoneBtn').style.display = 'block';
-            document.getElementById('finishZoneBtn').textContent = 'Ок';
-            document.getElementById('commentOkBtn').style.display = 'none';
-            document.getElementById('commentBtn').style.display = 'none';
-            document.getElementById('commentDisplayBtn').style.display = 'none';
+let clickCount = 0;
+let clickTimer = null;
+scooterTitle.addEventListener('click', () => {
+  if (gameActive) return;
+  clickCount++;
+  clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => { clickCount = 0; }, 2000);
+  if (clickCount >= 4) {
+    startGame();
+    clickCount = 0;
+  }
+});
 
-            if (mode === 3) {
-                document.getElementById('indicatorText').textContent = 'Выберите способ рисования:';
-                document.getElementById('selectMode1Btn').style.display = 'block';
-                document.getElementById('selectMode2Btn').style.display = 'block';
-                document.getElementById('commentBtn').style.display = 'block';
-                document.getElementById('commentDisplayBtn').style.display = 'none';
-                document.getElementById('commentInput').style.display = 'none';
-                document.getElementById('finishZoneBtn').style.display = 'none';
-            } else { selectDrawMode(mode); }
-        }
+sendBtn.addEventListener('click', async () => {
+  if (gameActive) {
+    endGame();
+    return;
+  }
+  
+  status.className = '';
+  if (!currentFile) { 
+    status.textContent = 'Сначала сделайте фото'; 
+    status.className='err'; 
+    return; 
+  }
+  if (!streetIn.value.trim()) { 
+    status.textContent = 'Укажите улицу'; 
+    status.className='err'; 
+    return; 
+  }
 
-        function selectDrawMode(mode) {
-            drawMode = mode; drawModeSelected = true;
-            document.getElementById('selectMode1Btn').style.display = 'none';
-            document.getElementById('selectMode2Btn').style.display = 'none';
-            if (willSaveZone) {
-                isMode3SubMode = true;
-                document.getElementById('indicatorText').style.display = 'none';
-                document.getElementById('finishZoneBtn').style.display = 'none';
-                document.getElementById('commentBtn').style.display = 'block';
-                document.getElementById('commentDisplayBtn').style.display = 'none';
-            } else {
-                isMode3SubMode = false;
-                document.getElementById('indicatorText').textContent = mode === 1 ? 'Кликайте по карте' : 'Зажмите и ведите';
-                document.getElementById('indicatorText').style.display = 'block';
-                document.getElementById('commentBtn').style.display = 'none';
-                document.getElementById('commentDisplayBtn').style.display = 'none';
-                document.getElementById('commentInput').style.display = 'none';
-                document.getElementById('commentOkBtn').style.display = 'none';
-                document.getElementById('finishZoneBtn').style.display = (mode === 2) ? 'none' : 'block';
-            }
-            if (mode === 2) myMap.behaviors.disable('drag');
-        }
+  sendBtn.disabled = true;
+  status.textContent = 'Отправляем...';
 
-        function activateCommentInput() {
-            if (!drawModeSelected) {
-                document.getElementById('indicatorText').textContent = 'Сначала выберите способ рисования:';
-                document.getElementById('indicatorText').style.display = 'block'; return;
-            }
-            document.getElementById('indicatorText').style.display = 'none';
-            document.getElementById('finishZoneBtn').style.display = 'none';
-            document.getElementById('commentBtn').style.display = 'none';
-            document.getElementById('commentDisplayBtn').style.display = 'none';
-            document.getElementById('commentInput').style.display = 'block';
-            document.getElementById('commentInput').value = '';
-            document.getElementById('commentInput').focus();
-            document.getElementById('commentOkBtn').style.display = 'block';
-        }
+  try {
+    const fd = new FormData();
+    fd.append('chat_id', CHAT_ID);
+    fd.append('photo', currentFile);
+    fd.append('caption', `📍 Улица: ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`);
 
-        function finishComment() {
-            zoneComment = document.getElementById('commentInput').value.trim();
-            document.getElementById('commentInput').style.display = 'none';
-            document.getElementById('commentOkBtn').style.display = 'none';
-            document.getElementById('commentDisplayBtn').textContent = zoneComment || 'Коммент';
-            document.getElementById('commentDisplayBtn').style.display = 'block';
-            document.getElementById('commentBtn').style.display = 'none';
-            document.getElementById('indicatorText').textContent = drawMode === 1 ? 'Кликайте по карте' : 'Зажмите и ведите';
-            document.getElementById('indicatorText').style.display = 'block';
-            document.getElementById('finishZoneBtn').style.display = (drawMode === 2) ? 'none' : 'block';
-        }
+    const r1 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: 'POST', 
+      body: fd
+    });
+    const j1 = await r1.json();
+    if (!j1.ok) throw new Error(j1.description || 'Ошибка отправки фото');
 
-        function addZonePoint(coords) {
-            if (drawMode === 2 && zonePoints.length > 0) {
-                var last = zonePoints[zonePoints.length - 1];
-                if (ymaps.coordSystem.geo.getDistance(last, coords) < 5) return;
-            }
-            zonePoints.push(coords);
-            if (drawMode === 1) {
-                var pointMarker = new ymaps.Placemark(coords, {}, {
-                    iconLayout: ymaps.templateLayoutFactory.createClass('<div style="width: 12px; height: 12px; background: #ff3b30; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: move;"></div>'),
-                    iconShape: { type: 'Circle', coordinates: [6, 6], radius: 6 }
-                });
-                myMap.geoObjects.add(pointMarker); zonePointMarkers.push(pointMarker);
-            }
-            updateZonePreview();
-        }
+    const r2 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text: `🛴 Новая находка\n📍 ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`
+      })
+    });
+    const j2 = await r2.json();
+    if (!j2.ok) throw new Error(j2.description);
 
-        function updateZonePreview() {
-            if (zonePolygon) { myMap.geoObjects.remove(zonePolygon); zonePolygon = null; }
-            if (zonePolyline) { myMap.geoObjects.remove(zonePolyline); zonePolyline = null; }
-            if (zonePoints.length < 2) return;
-            zonePolyline = new ymaps.Polyline(zonePoints, {}, { strokeColor: '#ff3b30', strokeWidth: 3, strokeStyle: 'solid' });
-            myMap.geoObjects.add(zonePolyline);
-        }
+    status.textContent = 'Отправлено! Спасибо';
+    status.className = 'ok';
+    clearPreview();
+    streetIn.value = '';
+  } catch (err) {
+    status.textContent = 'Ошибка: ' + err.message;
+    status.className = 'err';
+  } finally {
+    sendBtn.disabled = false;
+  }
+});
 
-        function enableVertexEditing() {
-            zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-            for (var i = 0; i < zonePoints.length; i++) {
-                (function(index) {
-                    var marker = new ymaps.Placemark(zonePoints[index], {}, {
-                        draggable: true,
-                        iconLayout: ymaps.templateLayoutFactory.createClass('<div style="width: 14px; height: 14px; background: #ff3b30; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: move;"></div>'),
-                        iconShape: { type: 'Circle', coordinates: [7, 7], radius: 7 }
-                    });
-                    marker.events.add('drag', function(e) {
-                        zonePoints[index] = e.get('target').geometry.getCoordinates();
-                        if (zonePolygon) zonePolygon.geometry.setCoordinates([zonePoints]);
-                    });
-                    myMap.geoObjects.add(marker); zonePointMarkers.push(marker);
-                })(i);
-            }
-        }
+function showPreview(file) {
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    photoPlaceholder.style.display = 'none';
+    photoPreview.src = e.target.result;
+    photoPreview.style.display = 'block';
+    photoCard.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
 
-        function closeFreehandZone() {
-            if (zonePoints.length < 3) { cancelZoneDrawing(); return; }
-            if (zonePolyline) { myMap.geoObjects.remove(zonePolyline); zonePolyline = null; }
-            zonePolygon = new ymaps.Polygon([zonePoints], {}, { fillColor: '#FFB6C1', fillOpacity: 0.5, strokeColor: '#ff3b30', strokeWidth: 3, strokeStyle: 'solid', draggable: false });
-            myMap.geoObjects.add(zonePolygon);
-            isZoneConfirmed = true;
-            zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-            if (willSaveZone) { saveZoneToServer(); } 
-            else { exitDrawingModeKeepPolygon(); }
-        }
+function clearPreview() {
+  currentFile = null;
+  photoPlaceholder.style.display = 'block';
+  photoPreview.src = '';
+  photoPreview.style.display = 'none';
+  cameraIn.value = '';
+  fileIn.value = '';
+  status.textContent = '';
+  if (!gameActive) photoCard.style.display = 'none';
+}
 
-        function finishZone() {
-            if (!isZoneConfirmed) {
-                if (drawMode === 1 && zonePoints.length < 3) { alert('Нужно минимум 3 точки!'); return; }
-                if (zonePolyline) { myMap.geoObjects.remove(zonePolyline); zonePolyline = null; }
-                zonePolygon = new ymaps.Polygon([zonePoints], {}, { fillColor: '#FFB6C1', fillOpacity: 0.5, strokeColor: '#ff3b30', strokeWidth: 3, strokeStyle: 'solid', draggable: false });
-                myMap.geoObjects.add(zonePolygon);
-                enableVertexEditing(); isZoneConfirmed = true;
-                document.getElementById('indicatorText').textContent = 'Точно всё?';
-                document.getElementById('indicatorText').style.display = 'block';
-                document.getElementById('finishZoneBtn').textContent = 'Ок';
-                document.getElementById('finishZoneBtn').style.display = 'block';
-                document.getElementById('commentBtn').style.display = 'none';
-                document.getElementById('commentDisplayBtn').style.display = 'none';
-                document.getElementById('commentInput').style.display = 'none';
-                document.getElementById('commentOkBtn').style.display = 'none';
-            } else {
-                zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-                if (willSaveZone) { saveZoneToServer(); } 
-                else { exitDrawingModeKeepPolygon(); }
-            }
-        }
+cameraBtn.addEventListener('click', () => { cameraIn.click(); });
+galleryBtn.addEventListener('click', () => { fileIn.click(); });
+cameraIn.addEventListener('change', e => { if (e.target.files[0]) showPreview(e.target.files[0]); });
+fileIn.addEventListener('change', e => { if (e.target.files[0]) showPreview(e.target.files[0]); });
+retakeBtn.addEventListener('click', () => {
+  if (gameActive) {
+    restartGame();
+  } else {
+    clearPreview();
+  }
+});
 
-        function exitDrawingModeKeepPolygon() {
-            isDrawingZone = false; drawMode = 1; willSaveZone = false; isZoneConfirmed = false;
-            drawModeSelected = false; isMode3SubMode = false; zonePoints = []; zoneComment = "";
-            freehandStartPoint = null; isDrawingFreehand = false;
-            zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-            myMap.behaviors.enable('drag'); myMap.behaviors.enable('multiTouch'); myMap.behaviors.enable('scrollZoom'); myMap.behaviors.enable('dblClickZoom');
-            document.getElementById('drawingIndicator').style.display = 'none';
-            myMap.container.getElement().style.cursor = '';
-        }
-
-        function resetDrawingState() {
-            isDrawingZone = false; drawMode = 1; willSaveZone = false; isZoneConfirmed = false;
-            drawModeSelected = false; isMode3SubMode = false; zonePoints = []; zoneComment = "";
-            freehandStartPoint = null; isDrawingFreehand = false;
-            zonePointMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); zonePointMarkers = [];
-            if (zonePolygon) { myMap.geoObjects.remove(zonePolygon); zonePolygon = null; }
-            if (zonePolyline) { myMap.geoObjects.remove(zonePolyline); zonePolyline = null; }
-            myMap.behaviors.enable('drag'); myMap.behaviors.enable('multiTouch'); myMap.behaviors.enable('scrollZoom'); myMap.behaviors.enable('dblClickZoom');
-            document.getElementById('drawingIndicator').style.display = 'none';
-            myMap.container.getElement().style.cursor = '';
-        }
-
-        function cancelZoneDrawing() { resetDrawingState(); }
-
-        function saveZoneToServer() {
-            var finalCoords = zonePolygon ? zonePolygon.geometry.getCoordinates()[0] : zonePoints;
-            fetch(API_URL + '/add_zone', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coords: finalCoords, comment: zoneComment })
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.success) { resetDrawingState(); loadZones(); }
-                else { alert('Ошибка сохранения зоны на сервере!'); }
-            }).catch(function(err) { console.error('Ошибка сети:', err); alert('Ошибка сети!'); });
-        }
-
-        function cancelDeleteZone() { zoneToDeleteId = null; document.getElementById('deleteZoneModal').style.display = 'none'; }
-
-        function confirmDeleteZone() {
-            if (!zoneToDeleteId) return;
-            fetch(API_URL + '/delete_zone', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: zoneToDeleteId })
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.success) { cancelDeleteZone(); loadZones(); }
-            });
-        }
-
-        function closeMaxDeadModal() { document.getElementById('maxDeadModal').style.display = 'none'; }
-
-        function getScooterImage(status) {
-            if (status === 'red') return BASE_URL + 'red.png';
-            if (status === 'not_found') return BASE_URL + 'black.png';
-            if (status === 'rented') return BASE_URL + 'ser.png';
-            return BASE_URL + 'green.png';
-        }
-
-        function createScooterIcon(status, taskNumber) {
-            var imgUrl = getScooterImage(status);
-            var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="50" viewBox="0 0 36 50">' +
-                '<image href="' + imgUrl + '" x="0" y="0" width="36" height="36" preserveAspectRatio="xMidYMid meet"/>' +
-                '<text x="18" y="48" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="black" text-anchor="middle">' + taskNumber + '</text>' +
-                '</svg>';
-            return {
-                iconLayout: ymaps.templateLayoutFactory.createClass('<div style="width:36px; height:50px;">' + svg + '</div>'),
-                iconShape: { type: 'Circle', coordinates: [18, 18], radius: 18 }
-            };
-        }
-
-        function createOsmScooterIcon(status, taskNumber) {
-            var imgUrl = getScooterImage(status);
-            return L.divIcon({
-                className: 'custom-div-icon',
-                html: '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="50" viewBox="0 0 36 50">' +
-                    '<image href="' + imgUrl + '" x="0" y="0" width="36" height="36" preserveAspectRatio="xMidYMid meet"/>' +
-                    '<text x="18" y="48" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="black" text-anchor="middle">' + taskNumber + '</text>' +
-                    '</svg>',
-                iconSize: [36, 50], iconAnchor: [18, 50]
-            });
-        }
-
-        function loadPoints() {
-            labelMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); labelMarkers = [];
-            osmLabelMarkers.forEach(function(m) { osmMap.removeLayer(m); }); osmLabelMarkers = [];
-            
-            fetch(API_URL + '/get_points').then(function(r) { return r.json(); }).then(function(data) {
-                markers.forEach(function(m) { myMap.geoObjects.remove(m); }); markers = [];
-                osmMarkers.forEach(function(m) { osmMap.removeLayer(m); }); osmMarkers = [];
-                
-                document.getElementById('pointCount').textContent = data.length;
-                data.forEach(function(point) {
-                    var isBooked = departures[point.id] !== undefined;
-                    
-                    var iconOptions = createScooterIcon(point.status, point.title.trim());
-                    if (isBooked) {
-                        var labelLayout = ymaps.templateLayoutFactory.createClass('<div style="background: black; color: white; font-size: 8px; font-weight: bold; padding: 3px 4px; border-radius: 3px; text-align: center; width: 44px; box-sizing: border-box; line-height: 1.2;">Выехали</div>');
-                        var lp = new ymaps.Placemark([point.lat, point.lon], {}, { iconLayout: labelLayout, iconOffset: [-4, -18], iconShape: { type: 'Rectangle', coordinates: [[0, 0], [44, 16]] } });
-                        myMap.geoObjects.add(lp); labelMarkers.push(lp);
-                    }
-                    var pm = new ymaps.Placemark([point.lat, point.lon], { balloonContent: buildBalloonContent(point, isBooked) }, iconOptions);
-                    pm.properties.set('pointData', point);
-                    myMap.geoObjects.add(pm); markers.push(pm);
-
-                    var osmIcon = createOsmScooterIcon(point.status, point.title.trim());
-                    if (isBooked) {
-                        var osmLabel = L.marker([point.lat, point.lon], {
-                            icon: L.divIcon({
-                                className: 'custom-div-icon',
-                                html: '<div style="background: black; color: white; font-size: 8px; font-weight: bold; padding: 3px 4px; border-radius: 3px; text-align: center; width: 44px; box-sizing: border-box; line-height: 1.2;">Выехали</div>',
-                                iconSize: [44, 16], iconAnchor: [22, 92]
-                            }),
-                            interactive: false
-                        }).addTo(osmMap);
-                        osmLabelMarkers.push(osmLabel);
-                    }
-                    var osmPm = L.marker([point.lat, point.lon], { icon: osmIcon }).addTo(osmMap);
-                    var popup = L.popup({ closeOnClick: false, autoClose: false }).setContent(buildBalloonContent(point, isBooked));
-                    osmPm.bindPopup(popup);
-                    osmPm.pointData = point;
-                    osmMarkers.push(osmPm);
-                });
-            });
-        }
-
-        function buildBalloonContent(point, isBooked) {
-            var esc = point.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            var fzLink = point.url ? '<a href="' + point.url + '" target="_blank" style="color: #1976D2; text-decoration: underline; font-weight: bold; display: block; margin: 5px 0;">ПОСМОТРЕТЬ ФЗ</a>' : '';
-            var commentHtml = point.comment ? '<small style="color: #000; display: block; margin: 5px 0;">' + point.comment + '</small>' : '';
-            
-            var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-            h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
-            h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
-            h += fzLink + commentHtml;
-            h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
-            h += '<button onclick="event.stopPropagation(); updateStatus(' + point.id + ', \'found\')" style="background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Нашёл</button>';
-            h += '<button onclick="event.stopPropagation(); updateStatus(' + point.id + ', \'not_found\')" style="background: #212121; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Не нашёл</button>';
-            h += '<button onclick="event.stopPropagation(); updateStatus(' + point.id + ', \'rented\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Уехал в аренду</button>';
-            if (isBooked) {
-                h += '<button onclick="event.stopPropagation(); resetDeparture(' + point.id + ')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Выехал ' + departures[point.id].name + '</button>';
-            } else {
-                h += '<button onclick="event.stopPropagation(); showChoiceMenu(' + point.id + ', \'' + esc + '\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Забронировать</button>';
-            }
-            h += '</div></div>';
-            return h;
-        }
-
-        function updateStatus(pointId, status) {
-            fetch(API_URL + '/update_status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: pointId, status: status }) })
-                .then(function(r) { return r.json(); }).then(function(data) {
-                    if (data.success) {
-                        if (status === 'found') {
-                            var pm = markers.find(function(m) { var d = m.properties.get('pointData'); return d && d.id === pointId; });
-                            if (pm) { myMap.geoObjects.remove(pm); markers = markers.filter(function(m) { return m !== pm; }); }
-                            var osmPm = osmMarkers.find(function(m) { return m.pointData && m.pointData.id === pointId; });
-                            if (osmPm) { osmMap.removeLayer(osmPm); osmMarkers = osmMarkers.filter(function(m) { return m !== osmPm; }); }
-                            if (departures[pointId]) {
-                                fetch(API_URL + '/remove_departure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ point_id: pointId }) });
-                                delete departures[pointId]; renderBottomPanel();
-                            }
-                            var countEl = document.getElementById('pointCount');
-                            var count = parseInt(countEl.textContent, 10);
-                            countEl.textContent = Math.max(0, count - 1);
-                        } else {
-                            if (departures[pointId]) {
-                                fetch(API_URL + '/remove_departure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ point_id: pointId }) })
-                                    .then(function() { delete departures[pointId]; renderBottomPanel(); loadPoints(); });
-                            } else { loadPoints(); }
-                        }
-                    }
-                });
-        }
-
-        function showChoiceMenu(pointId, pointTitle) {
-            // Для Яндекс Карт
-            var pm = markers.find(function(m) { var d = m.properties.get('pointData'); return d && d.id === pointId; });
-            if (pm) {
-                var point = pm.properties.get('pointData');
-                var esc = pointTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-                h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
-                h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
-                h += '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>';
-                h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
-                h += '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>';
-                h += '<button onclick="event.stopPropagation(); openCustomInputModal(' + pointId + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>';
-                h += '</div></div>';
-                pm.properties.set('balloonContent', h); 
-                pm.balloon.open();
-                return;
-            }
-
-            // Для OpenStreetMap (Leaflet)
-            var osmPm = osmMarkers.find(function(m) { return m.pointData && m.pointData.id === pointId; });
-            if (osmPm) {
-                var point = osmPm.pointData;
-                var esc = pointTitle.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                var h = '<div style="min-width: 200px; padding: 12px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-                h += '<b style="font-size: 16px; display: block;">' + point.title + '</b>';
-                h += '<div style="color: #555; font-size: 14px; margin: 8px 0;">' + point.address + '</div>';
-                h += '<small style="color: #999; display: block;">Статус: ' + point.status + '</small>';
-                h += '<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px;">';
-                h += '<button disabled style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px; opacity: 0.7;">Кто вы?</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Андрей\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Андрей</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Миша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Миша</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Илья\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Илья</button>';
-                h += '<button onclick="event.stopPropagation(); selectName(' + pointId + ', \'' + esc + '\', \'Саша\')" style="background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Саша</button>';
-                h += '<button onclick="event.stopPropagation(); openCustomInputModal(' + pointId + ', \'' + esc + '\')" style="background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 80%; text-align: center; padding: 8px 12px;">Ввести своё</button>';
-                h += '</div></div>';
-                osmPm.setPopupContent(h);
-                osmPm.openPopup();
-            }
-        }
-
-        function createParkingIcon() {
-            return {
-                iconLayout: ymaps.templateLayoutFactory.createClass('<div style="width: 18px; height: 18px; text-align: center; line-height: 18px;"><img src="' + BASE_URL + 'p.png" style="width: 18px; height: 18px; display: block;"></div>'),
-                iconShape: { type: 'Circle', coordinates: [9, 9], radius: 9 }
-            };
-        }
-
-        function createOsmParkingIcon() {
-            return L.divIcon({
-                className: 'custom-div-icon',
-                html: '<img src="' + BASE_URL + 'p.png" style="width: 18px; height: 18px; display: block;">',
-                iconSize: [18, 18], iconAnchor: [9, 9]
-            });
-        }
-
-        function buildLabelsHtml(available, dead, broken) {
-            var items = [
-                { value: available, label: 'В доступе', color: '#4CAF50' },
-                { value: broken, label: 'Поломки', color: '#7E0000' },
-                { value: dead, label: 'Севшие', color: '#f44336' }
-            ];
-            
-            items.sort(function(a, b) {
-                var aEmpty = (a.value === '?' || a.value === undefined || a.value === '');
-                var bEmpty = (b.value === '?' || b.value === undefined || b.value === '');
-                if (aEmpty && !bEmpty) return -1;
-                if (!aEmpty && bEmpty) return 1;
-                return 0;
-            });
-            
-            var html = '';
-            var hasVisible = false;
-            items.forEach(function(item) {
-                var isEmpty = (item.value === '?' || item.value === undefined || item.value === '');
-                if (appSettings.hide_empty_labels && isEmpty) return;
-                hasVisible = true;
-                html += '<div style="background: ' + item.color + '; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; white-space: nowrap; margin-bottom: 2px;">' + item.label + ': ' + (item.value || '?') + '</div>';
-            });
-            
-            return hasVisible ? html : null;
-        }
-
-        function createParkingLabels(lat, lon, available, dead, broken, pId) {
-            var html = buildLabelsHtml(available, dead, broken);
-            if (!html) return null;
-
-            var visibleCount = 0;
-            [available, broken, dead].forEach(function(v) {
-                var isEmpty = (v === '?' || v === undefined || v === '');
-                if (!(appSettings.hide_empty_labels && isEmpty)) visibleCount++;
-            });
-            
-            var offset = visibleCount * 17 + 5;
-
-            var layout = ymaps.templateLayoutFactory.createClass('<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100px;">' + html + '</div>');
-            return new ymaps.Placemark([lat, lon], {}, {
-                iconLayout: layout, iconOffset: [-41, -offset], iconShape: { type: 'Rectangle', coordinates: [[0, 0], [100, offset]] }
-            });
-        }
-
-        function createOsmParkingLabels(available, dead, broken) {
-            var html = buildLabelsHtml(available, dead, broken);
-            if (!html) return null;
-
-            var visibleCount = 0;
-            [available, broken, dead].forEach(function(v) {
-                var isEmpty = (v === '?' || v === undefined || v === '');
-                if (!(appSettings.hide_empty_labels && isEmpty)) visibleCount++;
-            });
-            
-            var totalHeight = visibleCount * 17;
-            var extraOffset = 22;
-
-            return L.divIcon({
-                className: 'custom-div-icon',
-                html: '<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100px;">' + html + '</div>',
-                iconSize: [100, totalHeight], iconAnchor: [51, totalHeight + extraOffset]
-            });
-        }
-
-        function loadParkings() {
-            parkingMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); parkingMarkers = [];
-            parkingLabelMarkers.forEach(function(m) { myMap.geoObjects.remove(m); }); parkingLabelMarkers = [];
-            osmParkingMarkers.forEach(function(m) { osmMap.removeLayer(m); }); osmParkingMarkers = [];
-            osmParkingLabelMarkers.forEach(function(m) { osmMap.removeLayer(m); }); osmParkingLabelMarkers = [];
-            
-            fetch(API_URL + '/get_parkings').then(function(r) { return r.json(); }).then(function(data) {
-                var totalDead = 0, maxDead = 0, maxDeadParkings = [];
-                data.forEach(function(p) {
-                    if (!p.lat || !p.lon) return;
-                    if (p.available === undefined) p.available = '?';
-                    if (p.dead === undefined) p.dead = '?';
-                    if (p.broken === undefined) p.broken = '?';
-                    
-                    try {
-                        if (appSettings.show_parkings) {
-                            var pm = new ymaps.Placemark([p.lat, p.lon], { balloonContent: buildParkingBalloon(p) }, createParkingIcon());
-                            pm.properties.set('parkingData', p);
-                            myMap.geoObjects.add(pm); parkingMarkers.push(pm);
-
-                            var osmPm = L.marker([p.lat, p.lon], { icon: createOsmParkingIcon() }).addTo(osmMap);
-                            var popup = L.popup({ closeOnClick: false, autoClose: false }).setContent(buildParkingBalloon(p));
-                            osmPm.bindPopup(popup);
-                            osmPm.parkingData = p;
-                            osmParkingMarkers.push(osmPm);
-                        }
-                        if (appSettings.show_labels) {
-                            var pl = createParkingLabels(p.lat, p.lon, p.available, p.dead, p.broken, p.id);
-                            if (pl) { myMap.geoObjects.add(pl); parkingLabelMarkers.push(pl); }
-
-                            var osmPl = createOsmParkingLabels(p.available, p.dead, p.broken);
-                            if (osmPl) {
-                                var osmLabel = L.marker([p.lat, p.lon], { icon: osmPl, interactive: false }).addTo(osmMap);
-                                osmParkingLabelMarkers.push(osmLabel);
-                            }
-                        }
-                        var deadNum = parseInt(p.dead, 10); if (isNaN(deadNum)) deadNum = 0;
-                        totalDead += deadNum;
-                        if (deadNum >= 5) {
-                            if (deadNum > maxDead) { maxDead = deadNum; maxDeadParkings = [p.title]; }
-                            else if (deadNum === maxDead) { maxDeadParkings.push(p.title); }
-                        }
-                    } catch (err) { console.error('Ошибка парковки ID:', p.id, err); }
-                });
-                document.getElementById('deadCount').textContent = totalDead;
-                document.getElementById('deadInfo').data = { maxDead: maxDead, maxDeadParkings: maxDeadParkings };
-            });
-        }
-
-        function toggleExtraVisibility() {
-            appSettings.hide_empty_labels = !appSettings.hide_empty_labels;
-            fetch(API_URL + '/update_setting', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: 'hide_empty_labels', value: appSettings.hide_empty_labels })
-            }).then(function() { loadParkings(); });
-        }
-
-        function resetParking(id) {
-            fetch(API_URL + '/update_parking', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id, available: '?', dead: '?', broken: '?' })
-            }).then(function(r) { return r.json(); }).then(function(data) { 
-                if (data.success) {
-                    loadParkings();
-                    if (myMap) myMap.balloon.close();
-                    if (osmMap) osmMap.closePopup();
-                }
-            });
-        }
-
-        function onDeadInfoClick() {
-            deadClickCount++;
-            if (deadClickTimer) clearTimeout(deadClickTimer);
-            deadClickTimer = setTimeout(function() { deadClickCount = 0; }, 600);
-            if (deadClickCount >= 3) {
-                deadClickCount = 0;
-                var data = document.getElementById('deadInfo').data || { maxDead: 0, maxDeadParkings: [] };
-                if (data.maxDead >= 5 && data.maxDeadParkings.length > 0) {
-                    var bodyText = data.maxDeadParkings.length === 1 ? 'На парковке "' + data.maxDeadParkings[0] + '" — ' + data.maxDead + ' севших' : 'На парковках ' + data.maxDeadParkings.map(function(n) { return '"' + n + '"'; }).join(', ') + ' — по ' + data.maxDead + ' севших';
-                    document.getElementById('maxDeadTitle').textContent = 'Больше всего севших';
-                    document.getElementById('maxDeadText').textContent = bodyText;
-                } else {
-                    document.getElementById('maxDeadTitle').textContent = 'Севшие на парковке';
-                    document.getElementById('maxDeadText').textContent = 'Нет парковок с 5 и более севшими самокатами';
-                }
-                document.getElementById('maxDeadModal').style.display = 'flex';
-            }
-        }
-
-        function buildParkingBalloon(p) {
-            var photoHtml = p.photo_url ? '<a href="' + p.photo_url + '" target="_blank" style="color: #1976D2; text-decoration: underline; font-weight: bold; display: block; margin-top: 10px;">ФОТО ПАРКОВКИ</a>' : '';
-            var btnText = appSettings.hide_empty_labels ? 'Вкл всё' : 'Выкл лишнее';
-            var btnColor = appSettings.hide_empty_labels ? '#4CAF50' : '#f44336';
-            var h = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-            h += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>' + photoHtml;
-            h += '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">';
-            h += '<button onclick="event.stopPropagation(); resetParking(' + p.id + ')" style="background: #0080ff; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">ЗАРЯДИЛ</button>';
-            h += '<div style="background: #4CAF50; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">В доступе: ' + p.available + '</div>';
-            h += '<div style="background: #7E0000; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">Поломки: ' + p.broken + '</div>';
-            h += '<div style="background: #f44336; color: white; padding: 10px; border-radius: 4px; font-weight: bold; font-size: 14px;">Севшие: ' + p.dead + '</div>';
-            h += '<button onclick="event.stopPropagation(); startEditParking(' + p.id + ')" style="background: #9E9E9E; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Изменить</button>';
-            h += '<button onclick="event.stopPropagation(); toggleExtraVisibility()" style="background: ' + btnColor + '; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">' + btnText + '</button>';
-            h += '</div></div>';
-            return h;
-        }
-
-        function startEditParking(id) {
-            // Для Яндекс Карт
-            var pm = parkingMarkers.find(function(m) { var d = m.properties.get('parkingData'); return d && d.id === id; });
-            if (pm) {
-                var p = pm.properties.get('parkingData');
-                var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-                html += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>';
-                html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
-                html += '<div><button id="btn_avail_' + id + '" onclick="event.stopPropagation(); activateInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>';
-                html += '<input id="inp_avail_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-                html += '<div><button id="btn_dead_' + id + '" onclick="event.stopPropagation(); activateInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>';
-                html += '<input id="inp_dead_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-                html += '<div><button id="btn_broken_' + id + '" onclick="event.stopPropagation(); activateInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>';
-                html += '<input id="inp_broken_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-                html += '<button onclick="event.stopPropagation(); saveParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>';
-                html += '</div></div>';
-                pm.properties.set('balloonContent', html); 
-                pm.balloon.open();
-                return;
-            }
-
-            // Для OpenStreetMap (Leaflet)
-            var osmPm = osmParkingMarkers.find(function(m) { return m.parkingData && m.parkingData.id === id; });
-            if (osmPm) {
-                var p = osmPm.parkingData;
-                var html = '<div style="min-width: 220px; padding: 15px; box-sizing: border-box; text-align: center;" onclick="event.stopPropagation()">';
-                html += '<b style="font-size: 16px; display: block; margin-bottom: 15px;">' + p.title + '</b>';
-                html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
-                html += '<div><button id="osm_btn_avail_' + id + '" onclick="event.stopPropagation(); activateOsmInput(\'avail\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">В доступе</button>';
-                html += '<input id="osm_inp_avail_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-                html += '<div><button id="osm_btn_dead_' + id + '" onclick="event.stopPropagation(); activateOsmInput(\'dead\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Севшие</button>';
-                html += '<input id="osm_inp_dead_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-                html += '<div><button id="osm_btn_broken_' + id + '" onclick="event.stopPropagation(); activateOsmInput(\'broken\', ' + id + ')" style="background: white; color: #333; border: 2px solid #333; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">Поломки</button>';
-                html += '<input id="osm_inp_broken_' + id + '" type="number" onclick="event.stopPropagation()" style="display: none; width: 100%; padding: 10px; border: 2px solid #333; border-radius: 4px; text-align: center; font-size: 16px; box-sizing: border-box;"></div>';
-                html += '<button onclick="event.stopPropagation(); saveOsmParking(' + id + ')" style="background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;">ОК</button>';
-                html += '</div></div>';
-                osmPm.setPopupContent(html);
-                osmPm.openPopup();
-            }
-        }
-
-        function activateInput(type, id) {
-            document.getElementById('btn_' + type + '_' + id).style.display = 'none';
-            var inp = document.getElementById('inp_' + type + '_' + id);
-            inp.style.display = 'block'; inp.value = ''; inp.focus();
-        }
-
-        function activateOsmInput(type, id) {
-            document.getElementById('osm_btn_' + type + '_' + id).style.display = 'none';
-            var inp = document.getElementById('osm_inp_' + type + '_' + id);
-            inp.style.display = 'block'; inp.value = ''; inp.focus();
-        }
-
-        function saveParking(id) {
-            var inpAvail = document.getElementById('inp_avail_' + id);
-            var inpDead = document.getElementById('inp_dead_' + id);
-            var inpBroken = document.getElementById('inp_broken_' + id);
-            var pm = parkingMarkers.find(function(m) { var d = m.properties.get('parkingData'); return d && d.id === id; });
-            var oldData = pm ? pm.properties.get('parkingData') : {available: '?', dead: '?', broken: '?'};
-            var newAvail = inpAvail.style.display !== 'none' && inpAvail.value.trim() !== '' ? inpAvail.value.trim() : oldData.available;
-            var newDead = inpDead.style.display !== 'none' && inpDead.value.trim() !== '' ? inpDead.value.trim() : oldData.dead;
-            var newBroken = inpBroken.style.display !== 'none' && inpBroken.value.trim() !== '' ? inpBroken.value.trim() : oldData.broken;
-            fetch(API_URL + '/update_parking', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id, available: newAvail, dead: newDead, broken: newBroken })
-            }).then(function(r) { return r.json(); }).then(function(data) { if (data.success) loadParkings(); });
-        }
-
-        function saveOsmParking(id) {
-            var inpAvail = document.getElementById('osm_inp_avail_' + id);
-            var inpDead = document.getElementById('osm_inp_dead_' + id);
-            var inpBroken = document.getElementById('osm_inp_broken_' + id);
-            var osmPm = osmParkingMarkers.find(function(m) { return m.parkingData && m.parkingData.id === id; });
-            var oldData = osmPm ? osmPm.parkingData : {available: '?', dead: '?', broken: '?'};
-            var newAvail = inpAvail.style.display !== 'none' && inpAvail.value.trim() !== '' ? inpAvail.value.trim() : oldData.available;
-            var newDead = inpDead.style.display !== 'none' && inpDead.value.trim() !== '' ? inpDead.value.trim() : oldData.dead;
-            var newBroken = inpBroken.style.display !== 'none' && inpBroken.value.trim() !== '' ? inpBroken.value.trim() : oldData.broken;
-            fetch(API_URL + '/update_parking', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id, available: newAvail, dead: newDead, broken: newBroken })
-            }).then(function(r) { return r.json(); }).then(function(data) { if (data.success) loadParkings(); });
-        }
-
-        function onTasksHeaderClick() {
-            tasksHeaderClickCount++;
-            if (tasksHeaderClickTimer) clearTimeout(tasksHeaderClickTimer);
-            tasksHeaderClickTimer = setTimeout(function() { tasksHeaderClickCount = 0; }, 1000);
-            if (tasksHeaderClickCount >= 3) { tasksHeaderClickCount = 0; openZoneModal(); }
-        }
-
-        function onInfoClick() {
-            infoClickCount++;
-            if (infoClickTimer) clearTimeout(infoClickTimer);
-            infoClickTimer = setTimeout(function() { infoClickCount = 0; }, 1000);
-            if (infoClickCount >= 3) {
-                infoClickCount = 0;
-                mapMode = (mapMode + 1) % 3;
-                
-                if (mapMode === 0) {
-                    document.getElementById('map').style.display = 'block';
-                    document.getElementById('osmMap').style.display = 'none';
-                    myMap.setType('yandex#map');
-                } else if (mapMode === 1) {
-                    document.getElementById('map').style.display = 'block';
-                    document.getElementById('osmMap').style.display = 'none';
-                    myMap.setType('yandex#hybrid');
-                } else if (mapMode === 2) {
-                    document.getElementById('map').style.display = 'none';
-                    document.getElementById('osmMap').style.display = 'block';
-                    setTimeout(function() { 
-                        osmMap.invalidateSize();
-                        loadPoints();
-                        loadParkings();
-                        loadZones();
-                    }, 200);
-                }
-            }
-        }
-
-        function openZoneModal() { document.getElementById('zoneModalOverlay').style.display = 'flex'; }
-        function closeZoneModal() { document.getElementById('zoneModalOverlay').style.display = 'none'; }
-
-        function loadDeparturesFromServer() {
-            fetch(API_URL + '/get_departures').then(function(r) { return r.json(); }).then(function(data) {
-                departures = {};
-                data.forEach(function(d) { departures[d.point_id] = { title: d.point_title, name: d.person_name }; });
-                renderBottomPanel();
-            });
-        }
-
-        function renderBottomPanel() {
-            var panel = document.getElementById('bottomPanel');
-            var list = document.getElementById('bottomDeparturesList');
-            var keys = Object.keys(departures);
-            if (keys.length === 0) { panel.style.display = 'none'; return; }
-            var html = '';
-            for (var i = 0; i < keys.length; i++) {
-                var d = departures[keys[i]];
-                html += '<div class="departure-item">За ' + d.title + ' ым выехал ' + d.name + '</div>';
-            }
-            list.innerHTML = html; panel.style.display = 'block';
-        }
-        function closeBottomPanel() { document.getElementById('bottomPanel').style.display = 'none'; }
-
-        function openCustomInputModal(pointId, pointTitle) {
-            currentModalPointId = pointId; currentModalPointTitle = pointTitle;
-            var modal = document.getElementById('modalOverlay');
-            var input = document.getElementById('modalInput');
-            input.value = ''; modal.style.display = 'flex';
-            setTimeout(function() { input.focus(); }, 100);
-        }
-
-        function confirmModalInput() {
-            var input = document.getElementById('modalInput');
-            var name = input.value.trim();
-            if (!name) { input.style.borderColor = '#f44336'; setTimeout(function() { input.style.borderColor = '#ddd'; }, 1000); return; }
-            document.getElementById('modalOverlay').style.display = 'none';
-            selectName(currentModalPointId, currentModalPointTitle, name);
-            currentModalPointId = null; currentModalPointTitle = null;
-        }
-
-        document.addEventListener('click', function(e) { 
-            if (e.target.id === 'modalOverlay') document.getElementById('modalOverlay').style.display = 'none';
-            if (e.target.id === 'deleteZoneModal') cancelDeleteZone();
-            if (e.target.id === 'maxDeadModal') closeMaxDeadModal();
-        });
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('modalInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); confirmModalInput(); } });
-        });
-
-        function selectName(pointId, pointTitle, name) {
-            fetch(API_URL + '/add_departure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ point_id: pointId, point_title: pointTitle, person_name: name }) })
-                .then(function(r) { return r.json(); }).then(function(data) {
-                    if (data.success) {
-                        departures[pointId] = { title: pointTitle, name: name };
-                        renderBottomPanel(); loadPoints();
-                    }
-                });
-        }
-
-        function resetDeparture(pointId) {
-            fetch(API_URL + '/remove_departure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ point_id: pointId }) })
-                .then(function(r) { return r.json(); }).then(function(data) {
-                    if (data.success) {
-                        delete departures[pointId]; renderBottomPanel(); loadPoints();
-                    }
-                });
-        }
-    </script>
+logoutBtn.addEventListener('click', () => {
+  if (gameActive) endGame();
+  if (navigator.app) {
+    navigator.app.exitApp();
+  } else {
+    window.close();
+    setTimeout(() => { alert('Закройте вкладку браузера для выхода из приложения'); }, 100);
+  }
+});
+</script>
 </body>
 </html>
