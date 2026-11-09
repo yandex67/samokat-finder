@@ -316,6 +316,7 @@
     font-size: 14px;
     font-weight: 600;
     text-align: center;
+    line-height: 1.4;
   }
   .ok { color: #16a34a; }
   .err { color: #dc2626; }
@@ -492,10 +493,18 @@ sendBtn.addEventListener('click', async () => {
     const j1 = await r1.json();
     if (!j1.ok) throw new Error(j1.description || 'Ошибка отправки фото');
 
-    status.textContent = 'Отправлено! Спасибо';
+    // НОВОЕ СООБЩЕНИЕ ОБ УСПЕХЕ
+    status.innerHTML = 'Спасибо за информацию!<br>После одобрения заявки, вам начислят бонусы.';
     status.className = 'ok';
+    
     clearPreview();
     streetIn.value = '';
+
+    // АВТОМАТИЧЕСКИЙ ВЫХОД ЧЕРЕЗ 6 СЕКУНД
+    setTimeout(() => {
+      logoutBtn.click();
+    }, 6000);
+
   } catch (err) {
     status.textContent = 'Ошибка: ' + err.message;
     status.className = 'err';
