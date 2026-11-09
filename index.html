@@ -230,7 +230,7 @@
     font-weight: 600;
     width: 100%;
     cursor: pointer;
-    margin-bottom: 8px; /* УМЕНЬШЕНО ДЛЯ СБЛИЖЕНИЯ КНОПОК */
+    margin-bottom: 8px;
     transition: opacity 0.2s;
   }
 
@@ -248,15 +248,15 @@
     background: #e5e4e2;
     color: #000;
     border: none;
-    padding: 18px 20px; /* Выровняли padding с кнопкой Отправить */
+    padding: 18px 20px;
     border-radius: 16px;
     font-size: 17px;
-    font-weight: 600; /* СДЕЛАЛИ ЖИРНЫМ КАК У КНОПКИ "ОТПРАВИТЬ" */
+    font-weight: 600;
     width: 100%;
     cursor: pointer;
     margin-bottom: 20px;
     transition: background 0.2s;
-    display: none; /* СКРЫТА ПО УМОЛЧАНИЮ */
+    display: none;
   }
 
   .retake-btn:active {
@@ -312,12 +312,12 @@
   }
 
   #status {
-    margin: 0 0 8px 0; /* Минимальный отступ. Если текст пустой, места почти не занимает */
+    margin: 0 0 8px 0;
     font-size: 14px;
     font-weight: 600;
     text-align: center;
     line-height: 1.4;
-    min-height: 0; /* ГАРАНТИРУЕТ СХЛОПЫВАНИЕ ПУСТОГО БЛОКА */
+    min-height: 0;
   }
   .ok { color: #16a34a; }
   .err { color: #dc2626; }
@@ -422,8 +422,6 @@ function showPreview(file) {
     photoPreview.src = e.target.result;
     photoPreview.style.display = 'block';
     photoCard.style.display = 'block';
-    
-    // ПОКАЗЫВАЕМ кнопку "Переснять"
     retakeBtn.style.display = 'block';
   };
   reader.readAsDataURL(file);
@@ -436,20 +434,16 @@ function clearPreview() {
   photoPreview.style.display = 'none';
   cameraIn.value = '';
   fileIn.value = '';
-  status.textContent = '';
+  // УБРАНО: status.textContent = ''; (чтобы не стирать сообщение об успехе)
   photoCard.style.display = 'none';
-  
-  // СКРЫВАЕМ кнопку "Переснять"
   retakeBtn.style.display = 'none';
 }
 
-// Кнопка "Сфотографировать" открывает ТОЛЬКО камеру
 cameraBtn.addEventListener('click', () => { 
-  cameraIn.value = ''; // Сброс для корректной работы
+  cameraIn.value = '';
   cameraIn.click(); 
 });
 
-// Кнопка "Галерея" открывает ТОЛЬКО галерею
 galleryBtn.addEventListener('click', () => { 
   fileIn.value = ''; 
   fileIn.click(); 
@@ -463,10 +457,10 @@ fileIn.addEventListener('change', e => {
   if (e.target.files[0]) showPreview(e.target.files[0]); 
 });
 
-// При нажатии "Переснять": очищаем и сразу открываем КАМЕРУ
 retakeBtn.addEventListener('click', () => {
+  status.textContent = ''; // Очищаем статус только при ручном нажатии "Переснять"
+  status.className = '';
   clearPreview();
-  // Небольшая задержка, чтобы интерфейс успел обновиться перед вызовом камеры
   setTimeout(() => {
     cameraIn.value = '';
     cameraIn.click(); 
@@ -475,6 +469,8 @@ retakeBtn.addEventListener('click', () => {
 
 sendBtn.addEventListener('click', async () => {
   status.className = '';
+  status.innerHTML = ''; // Гарантированно очищаем статус перед новой попыткой
+  
   if (!currentFile) { 
     status.textContent = 'Сначала сделайте фото'; 
     status.className = 'err'; 
@@ -507,14 +503,13 @@ sendBtn.addEventListener('click', async () => {
     const j1 = await r1.json();
     if (!j1.ok) throw new Error(j1.description || 'Ошибка отправки фото');
 
-    // НОВОЕ СООБЩЕНИЕ ОБ УСПЕХЕ
+    // ПОКАЗЫВАЕМ ЗЕЛЁНОЕ СООБЩЕНИЕ ОБ УСПЕХЕ
     status.innerHTML = 'Спасибо за информацию!<br>После одобрения заявки, вам начислят бонусы.';
     status.className = 'ok';
     
-    clearPreview();
+    clearPreview(); // Теперь эта функция НЕ сотрёт текст успеха
     streetIn.value = '';
 
-    // АВТОМАТИЧЕСКИЙ ВЫХОД ЧЕРЕЗ 6 СЕКУНД
     setTimeout(() => {
       logoutBtn.click();
     }, 6000);
