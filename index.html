@@ -230,7 +230,7 @@
     font-weight: 600;
     width: 100%;
     cursor: pointer;
-    margin-bottom: 12px;
+    margin-bottom: 8px; /* УМЕНЬШЕНО ДЛЯ СБЛИЖЕНИЯ КНОПОК */
     transition: opacity 0.2s;
   }
 
@@ -248,10 +248,10 @@
     background: #e5e4e2;
     color: #000;
     border: none;
-    padding: 16px 20px;
+    padding: 18px 20px; /* Выровняли padding с кнопкой Отправить */
     border-radius: 16px;
     font-size: 17px;
-    font-weight: 500;
+    font-weight: 600; /* СДЕЛАЛИ ЖИРНЫМ КАК У КНОПКИ "ОТПРАВИТЬ" */
     width: 100%;
     cursor: pointer;
     margin-bottom: 20px;
@@ -312,11 +312,12 @@
   }
 
   #status {
-    margin: 12px 0 24px 0; /* УВЕЛИЧЕННЫЙ ОТСТУП СНИЗУ ДО КНОПКИ ПЕРЕСНЯТЬ */
+    margin: 0 0 8px 0; /* Минимальный отступ. Если текст пустой, места почти не занимает */
     font-size: 14px;
     font-weight: 600;
     text-align: center;
     line-height: 1.4;
+    min-height: 0; /* ГАРАНТИРУЕТ СХЛОПЫВАНИЕ ПУСТОГО БЛОКА */
   }
   .ok { color: #16a34a; }
   .err { color: #dc2626; }
@@ -338,7 +339,7 @@
   <div class="rewards-content">
     <img src="icons/star.png" alt="Звезда" class="rewards-star">
     <div>
-      <div class="rewards-text">100</div>
+      <div class="rewards-text">0</div>
       <div class="rewards-subtext">Баллы = Рубли</div>
     </div>
   </div>
@@ -442,8 +443,17 @@ function clearPreview() {
   retakeBtn.style.display = 'none';
 }
 
-cameraBtn.addEventListener('click', () => { cameraIn.click(); });
-galleryBtn.addEventListener('click', () => { fileIn.click(); });
+// Кнопка "Сфотографировать" открывает ТОЛЬКО камеру
+cameraBtn.addEventListener('click', () => { 
+  cameraIn.value = ''; // Сброс для корректной работы
+  cameraIn.click(); 
+});
+
+// Кнопка "Галерея" открывает ТОЛЬКО галерею
+galleryBtn.addEventListener('click', () => { 
+  fileIn.value = ''; 
+  fileIn.click(); 
+});
 
 cameraIn.addEventListener('change', e => { 
   if (e.target.files[0]) showPreview(e.target.files[0]); 
@@ -453,10 +463,14 @@ fileIn.addEventListener('change', e => {
   if (e.target.files[0]) showPreview(e.target.files[0]); 
 });
 
-// При нажатии "Переснять": очищаем и сразу открываем камеру
+// При нажатии "Переснять": очищаем и сразу открываем КАМЕРУ
 retakeBtn.addEventListener('click', () => {
   clearPreview();
-  cameraIn.click(); 
+  // Небольшая задержка, чтобы интерфейс успел обновиться перед вызовом камеры
+  setTimeout(() => {
+    cameraIn.value = '';
+    cameraIn.click(); 
+  }, 50);
 });
 
 sendBtn.addEventListener('click', async () => {
