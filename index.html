@@ -1114,11 +1114,6 @@ scooterTitle.addEventListener('click', () => {
 });
 
 sendBtn.addEventListener('click', async () => {
-  if (gameActive) {
-    endGame();
-    return;
-  }
-  
   status.className = '';
   if (!currentFile) { 
     status.textContent = 'Сначала сделайте фото'; 
@@ -1138,25 +1133,21 @@ sendBtn.addEventListener('click', async () => {
     const fd = new FormData();
     fd.append('chat_id', CHAT_ID);
     fd.append('photo', currentFile);
-    fd.append('caption', `📍 Улица: ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`);
+    
+    // Формируем красивую подпись в ОДНОМ сообщении
+    const captionText = `🛴 *Новая находка!*\n📍 Улица: ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`;
+    
+    fd.append('caption', captionText);
+    fd.append('parse_mode', 'Markdown'); // Делает текст жирным
 
+    // Отправляем ТОЛЬКО фото с подписью (убрали лишний запрос sendMessage)
     const r1 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
       method: 'POST', 
       body: fd
     });
+    
     const j1 = await r1.json();
     if (!j1.ok) throw new Error(j1.description || 'Ошибка отправки фото');
-
-    const r2 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text: `🛴 Новая находка\n📍 ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`
-      })
-    });
-    const j2 = await r2.json();
-    if (!j2.ok) throw new Error(j2.description);
 
     status.textContent = 'Отправлено! Спасибо';
     status.className = 'ok';
