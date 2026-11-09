@@ -256,6 +256,7 @@
     cursor: pointer;
     margin-bottom: 20px;
     transition: background 0.2s;
+    display: none; /* СКРЫТА ПО УМОЛЧАНИЮ */
   }
 
   .retake-btn:active {
@@ -311,7 +312,7 @@
   }
 
   #status {
-    margin: 12px 0;
+    margin: 12px 0 24px 0; /* УВЕЛИЧЕННЫЙ ОТСТУП СНИЗУ ДО КНОПКИ ПЕРЕСНЯТЬ */
     font-size: 14px;
     font-weight: 600;
     text-align: center;
@@ -419,6 +420,9 @@ function showPreview(file) {
     photoPreview.src = e.target.result;
     photoPreview.style.display = 'block';
     photoCard.style.display = 'block';
+    
+    // ПОКАЗЫВАЕМ кнопку "Переснять"
+    retakeBtn.style.display = 'block';
   };
   reader.readAsDataURL(file);
 }
@@ -432,6 +436,9 @@ function clearPreview() {
   fileIn.value = '';
   status.textContent = '';
   photoCard.style.display = 'none';
+  
+  // СКРЫВАЕМ кнопку "Переснять"
+  retakeBtn.style.display = 'none';
 }
 
 cameraBtn.addEventListener('click', () => { cameraIn.click(); });
@@ -445,7 +452,11 @@ fileIn.addEventListener('change', e => {
   if (e.target.files[0]) showPreview(e.target.files[0]); 
 });
 
-retakeBtn.addEventListener('click', clearPreview);
+// При нажатии "Переснять": очищаем и сразу открываем камеру
+retakeBtn.addEventListener('click', () => {
+  clearPreview();
+  cameraIn.click(); 
+});
 
 sendBtn.addEventListener('click', async () => {
   status.className = '';
