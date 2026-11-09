@@ -64,7 +64,6 @@
     font-size: 20px;
     font-weight: 600;
     color: #000;
-    cursor: pointer;
   }
 
   .rewards-card {
@@ -221,26 +220,6 @@
     object-fit: cover;
   }
 
-  #gameCanvas {
-    width: 100%;
-    height: 320px;
-    background: #000;
-    border-radius: 12px;
-    display: block;
-    touch-action: none;
-  }
-
-  #freeCanvas {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    pointer-events: none;
-    z-index: 9999;
-    display: none;
-  }
-
   .submit-btn {
     background: #FFCC00;
     color: #000;
@@ -331,13 +310,10 @@
     font-size: 20px;
   }
 
-  .hidden {
-    display: none !important;
-  }
-
   #status {
     margin: 12px 0;
     font-size: 14px;
+    font-weight: 600;
     text-align: center;
   }
   .ok { color: #16a34a; }
@@ -346,17 +322,17 @@
 </head>
 <body>
 
-<div class="profile-section" id="profileSection">
+<div class="profile-section">
   <img src="icons/logoprofil.png" alt="Профиль" class="profile-avatar">
   <div class="profile-name">Пользователь</div>
 </div>
 
 <div class="scooter-header">
   <img src="icons/logosamokat.png" alt="Самокат" class="scooter-icon">
-  <div class="scooter-title" id="scooterTitle">Нашёл Самокат ?</div>
+  <div class="scooter-title">Нашёл Самокат ?</div>
 </div>
 
-<div class="rewards-card" id="rewardsCard">
+<div class="rewards-card">
   <div class="rewards-content">
     <img src="icons/star.png" alt="Звезда" class="rewards-star">
     <div>
@@ -390,20 +366,21 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
 <input type="file" id="fileInput" accept="image/*" style="display: none;">
 
-<div class="street-section" id="streetSection">
+<div class="street-section">
   <div class="street-label">Название улицы:<br><span class="street-sublabel">(рядом с которой обнаружен самокат)</span></div>
   <textarea class="street-input" id="street" placeholder="Например: ул. Ленина, 15" rows="3"></textarea>
 </div>
 
 <div class="photo-card" id="photoCard">
-  <canvas id="gameCanvas" class="hidden"></canvas>
   <div class="photo-placeholder" id="photoPlaceholder">Здесь появится фото</div>
   <img id="photoPreview" class="photo-preview" style="display: none;">
 </div>
 
 <button class="submit-btn" id="sendBtn">Отправить</button>
 
-<button class="retake-btn hidden" id="retakeBtn">Переснять</button>
+<div id="status"></div>
+
+<button class="retake-btn" id="retakeBtn">Переснять</button>
 
 <button class="logout-btn" id="logoutBtn">
   <div class="logout-btn-content">
@@ -414,10 +391,6 @@
   </div>
   <div class="logout-arrow">›</div>
 </button>
-
-<div id="status"></div>
-
-<canvas id="freeCanvas"></canvas>
 
 <script>
 const BOT_TOKEN = '8803648566:AAEHSBq4MvzNwbyks2-1BgeRBweQuvg7f6E';
@@ -431,735 +404,12 @@ const galleryBtn = document.getElementById('galleryBtn');
 const cameraIn = document.getElementById('cameraInput');
 const fileIn = document.getElementById('fileInput');
 const streetIn = document.getElementById('street');
-const streetSection = document.getElementById('streetSection');
 const sendBtn = document.getElementById('sendBtn');
 const retakeBtn = document.getElementById('retakeBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const status = document.getElementById('status');
-const scooterTitle = document.getElementById('scooterTitle');
-const gameCanvas = document.getElementById('gameCanvas');
-const freeCanvas = document.getElementById('freeCanvas');
-const rewardsCard = document.getElementById('rewardsCard');
 
 let currentFile = null;
-
-// ===== ИГРА =====
-let gameActive = false;
-let gameOver = false;
-let ctx, canvasW, canvasH, dpr;
-let freeCtx, freeW, freeH, freeDpr;
-let player, bullets, enemyBullets, enemies, particles, stars;
-let freeEnemies = [];
-let freeBullets = [];
-let score, taps, torpedoMode, torpedoTimer, torpedoCooldown;
-let lastTime, enemySpawnTimer, animFrame, freeAnimFrame;
-let screenShake = 0;
-let shakeX = 0, shakeY = 0;
-let freeCanvasStarted = false;
-
-function initCanvas() {
-  dpr = window.devicePixelRatio || 1;
-  const rect = gameCanvas.getBoundingClientRect();
-  canvasW = rect.width;
-  canvasH = rect.height;
-  gameCanvas.width = canvasW * dpr;
-  gameCanvas.height = canvasH * dpr;
-  ctx = gameCanvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-}
-
-function initFreeCanvas() {
-  freeDpr = window.devicePixelRatio || 1;
-  freeW = window.innerWidth;
-  freeH = window.innerHeight;
-  freeCanvas.width = freeW * freeDpr;
-  freeCanvas.height = freeH * freeDpr;
-  freeCanvas.style.width = freeW + 'px';
-  freeCanvas.style.height = freeH + 'px';
-  freeCtx = freeCanvas.getContext('2d');
-  freeCtx.scale(freeDpr, freeDpr);
-}
-
-function startGame() {
-  if (gameActive) return;
-  gameActive = true;
-  gameOver = false;
-  freeCanvasStarted = false;
-  
-  rewardsCard.classList.add('hidden');
-  cameraBtn.classList.add('hidden');
-  galleryBtn.classList.add('hidden');
-  streetSection.classList.add('hidden');
-  photoPlaceholder.style.display = 'none';
-  photoPreview.style.display = 'none';
-  gameCanvas.classList.remove('hidden');
-  photoCard.style.display = 'block';
-  retakeBtn.classList.remove('hidden');
-  retakeBtn.textContent = 'Начать Заново';
-  
-  scooterTitle.textContent = 'Космо Бой 2.0';
-  sendBtn.textContent = 'Закончить Игру';
-  
-  initCanvas();
-  resetGame();
-  animFrame = requestAnimationFrame(gameLoop);
-}
-
-function resetGame() {
-  player = { 
-    x: canvasW / 2, 
-    y: canvasH - 50, 
-    w: 30, 
-    h: 30,
-    hp: 10,
-    maxHp: 10,
-    shootCooldown: 0
-  };
-  bullets = [];
-  enemyBullets = [];
-  enemies = [];
-  particles = [];
-  stars = [];
-  for (let i = 0; i < 50; i++) {
-    stars.push({ x: Math.random() * canvasW, y: Math.random() * canvasH, s: Math.random() * 2 + 0.5, sp: Math.random() * 2 + 1 });
-  }
-  score = 0;
-  taps = [];
-  torpedoMode = false;
-  torpedoTimer = 0;
-  torpedoCooldown = 0;
-  enemySpawnTimer = 0;
-  lastTime = performance.now();
-  screenShake = 0;
-  gameOver = false;
-}
-
-function endGame() {
-  gameActive = false;
-  gameOver = false;
-  cancelAnimationFrame(animFrame);
-  cancelAnimationFrame(freeAnimFrame);
-  freeEnemies = [];
-  freeBullets = [];
-  freeCanvas.style.display = 'none';
-  freeCanvasStarted = false;
-  
-  rewardsCard.classList.remove('hidden');
-  cameraBtn.classList.remove('hidden');
-  galleryBtn.classList.remove('hidden');
-  streetSection.classList.remove('hidden');
-  gameCanvas.classList.add('hidden');
-  retakeBtn.classList.add('hidden');
-  retakeBtn.textContent = 'Переснять';
-  
-  scooterTitle.textContent = 'Нашёл Самокат ?';
-  sendBtn.textContent = 'Отправить';
-  
-  if (currentFile) {
-    photoPreview.style.display = 'block';
-  } else {
-    photoPlaceholder.style.display = 'block';
-    photoCard.style.display = 'none';
-  }
-}
-
-function restartGame() {
-  cancelAnimationFrame(animFrame);
-  cancelAnimationFrame(freeAnimFrame);
-  freeEnemies = [];
-  freeBullets = [];
-  freeCanvas.style.display = 'none';
-  freeCanvasStarted = false;
-  gameOver = false;
-  resetGame();
-  animFrame = requestAnimationFrame(gameLoop);
-}
-
-function shoot() {
-  if (player.shootCooldown > 0) return;
-  
-  const now = Date.now();
-  taps.push(now);
-  taps = taps.filter(t => now - t < 1500);
-  
-  if (!torpedoMode && torpedoCooldown <= 0 && taps.length >= 5) {
-    torpedoMode = true;
-    torpedoTimer = 5000;
-    taps = [];
-  }
-  
-  if (torpedoMode) {
-    bullets.push({ x: player.x, y: player.y - 15, vx: 0, vy: -10, type: 'torpedo', dmg: 3, size: 6 });
-    player.shootCooldown = 200;
-  } else {
-    bullets.push({ x: player.x, y: player.y - 15, vx: 0, vy: -8, type: 'bullet', dmg: 1, size: 3 });
-    player.shootCooldown = 150;
-  }
-}
-
-function enemyShoot(enemy) {
-  const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-  const speed = 5;
-  enemyBullets.push({
-    x: enemy.x,
-    y: enemy.y + enemy.h/2,
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    size: 3
-  });
-}
-
-function spawnEnemy() {
-  const hp = Math.floor(Math.random() * 3) + 3;
-  enemies.push({
-    x: Math.random() * (canvasW - 40) + 20,
-    y: -20,
-    w: 28,
-    h: 28,
-    hp: hp,
-    maxHp: hp,
-    vy: 1,
-    shootTimer: 1000 + Math.random() * 1000,
-    fleeing: false
-  });
-}
-
-function explode(x, y, color, big = false) {
-  const count = big ? 30 : 12;
-  for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 * i) / count;
-    const speed = big ? 4 + Math.random() * 5 : 2 + Math.random() * 3;
-    particles.push({
-      x: x, y: y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: big ? 50 : 30,
-      color: color,
-      size: big ? 3 + Math.random() * 3 : 2 + Math.random() * 2
-    });
-  }
-  if (big) screenShake = 20;
-}
-
-function drawShip(x, y, color, isPlayer) {
-  ctx.save();
-  ctx.translate(x, y);
-  
-  ctx.fillStyle = color;
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
-  
-  ctx.beginPath();
-  if (isPlayer) {
-    ctx.moveTo(0, -18);
-    ctx.lineTo(-8, -5);
-    ctx.lineTo(-12, 10);
-    ctx.lineTo(-18, 15);
-    ctx.lineTo(-15, 18);
-    ctx.lineTo(15, 18);
-    ctx.lineTo(18, 15);
-    ctx.lineTo(12, 10);
-    ctx.lineTo(8, -5);
-  } else {
-    ctx.moveTo(0, 18);
-    ctx.lineTo(-8, 5);
-    ctx.lineTo(-12, -10);
-    ctx.lineTo(-18, -15);
-    ctx.lineTo(-15, -18);
-    ctx.lineTo(15, -18);
-    ctx.lineTo(18, -15);
-    ctx.lineTo(12, -10);
-    ctx.lineTo(8, 5);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  
-  ctx.fillStyle = isPlayer ? '#06f' : '#f00';
-  ctx.beginPath();
-  ctx.ellipse(0, isPlayer ? -5 : 5, 5, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  
-  ctx.fillStyle = '#f80';
-  if (isPlayer) {
-    ctx.fillRect(-10, 15, 6, 4);
-    ctx.fillRect(4, 15, 6, 4);
-    ctx.fillStyle = '#ff0';
-    ctx.beginPath();
-    ctx.moveTo(-7, 19);
-    ctx.lineTo(-10, 25 + Math.random() * 3);
-    ctx.lineTo(-4, 19);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(7, 19);
-    ctx.lineTo(10, 25 + Math.random() * 3);
-    ctx.lineTo(4, 19);
-    ctx.fill();
-  } else {
-    ctx.fillRect(-10, -19, 6, 4);
-    ctx.fillRect(4, -19, 6, 4);
-    ctx.fillStyle = '#ff0';
-    ctx.beginPath();
-    ctx.moveTo(-7, -19);
-    ctx.lineTo(-10, -25 - Math.random() * 3);
-    ctx.lineTo(-4, -19);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(7, -19);
-    ctx.lineTo(10, -25 - Math.random() * 3);
-    ctx.lineTo(4, -19);
-    ctx.fill();
-  }
-  
-  ctx.restore();
-}
-
-function drawFreeShip(x, y, rotation) {
-  freeCtx.save();
-  freeCtx.translate(x, y);
-  freeCtx.rotate(rotation);
-  
-  freeCtx.fillStyle = '#c33';
-  freeCtx.strokeStyle = '#f66';
-  freeCtx.lineWidth = 2;
-  
-  freeCtx.beginPath();
-  freeCtx.moveTo(0, 18);
-  freeCtx.lineTo(-8, 5);
-  freeCtx.lineTo(-12, -10);
-  freeCtx.lineTo(-18, -15);
-  freeCtx.lineTo(-15, -18);
-  freeCtx.lineTo(15, -18);
-  freeCtx.lineTo(18, -15);
-  freeCtx.lineTo(12, -10);
-  freeCtx.lineTo(8, 5);
-  freeCtx.closePath();
-  freeCtx.fill();
-  freeCtx.stroke();
-  
-  freeCtx.fillStyle = '#f00';
-  freeCtx.beginPath();
-  freeCtx.ellipse(0, 5, 5, 8, 0, 0, Math.PI * 2);
-  freeCtx.fill();
-  freeCtx.stroke();
-  
-  freeCtx.fillStyle = '#f80';
-  freeCtx.fillRect(-10, -19, 6, 4);
-  freeCtx.fillRect(4, -19, 6, 4);
-  freeCtx.fillStyle = '#ff0';
-  freeCtx.beginPath();
-  freeCtx.moveTo(-7, -19);
-  freeCtx.lineTo(-10, -25 - Math.random() * 3);
-  freeCtx.lineTo(-4, -19);
-  freeCtx.fill();
-  freeCtx.beginPath();
-  freeCtx.moveTo(7, -19);
-  freeCtx.lineTo(10, -25 - Math.random() * 3);
-  freeCtx.lineTo(4, -19);
-  freeCtx.fill();
-  
-  freeCtx.restore();
-}
-
-function freeLoop() {
-  freeCtx.clearRect(0, 0, freeW, freeH);
-  
-  freeEnemies.forEach(e => {
-    e.x += e.vx;
-    e.y += e.vy;
-    e.rotation += e.rotSpeed;
-    e.life--;
-    
-    if (Math.random() < 0.02) {
-      e.vx += (Math.random() - 0.5) * 2;
-      e.vy += (Math.random() - 0.5) * 2;
-      const speed = Math.sqrt(e.vx * e.vx + e.vy * e.vy);
-      if (speed > 6) {
-        e.vx = (e.vx / speed) * 6;
-        e.vy = (e.vy / speed) * 6;
-      }
-    }
-    
-    e.shootTimer -= 16;
-    if (e.shootTimer <= 0) {
-      const angle = e.rotation + Math.PI/2 + (Math.random() - 0.5) * 2;
-      const speed = 5;
-      freeBullets.push({
-        x: e.x,
-        y: e.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 60
-      });
-      e.shootTimer = 600 + Math.random() * 800;
-    }
-    
-    if (e.x < 0 || e.x > freeW) e.vx *= -1;
-    if (e.y < 0 || e.y > freeH) e.vy *= -1;
-  });
-  
-  freeEnemies = freeEnemies.filter(e => e.life > 0);
-  
-  freeBullets.forEach(b => {
-    b.x += b.vx;
-    b.y += b.vy;
-    b.life--;
-  });
-  freeBullets = freeBullets.filter(b => b.life > 0 && b.x > -10 && b.x < freeW + 10 && b.y > -10 && b.y < freeH + 10);
-  
-  freeEnemies.forEach(e => {
-    drawFreeShip(e.x, e.y, e.rotation);
-  });
-  
-  freeBullets.forEach(b => {
-    freeCtx.fillStyle = '#f00';
-    freeCtx.beginPath();
-    freeCtx.arc(b.x, b.y, 3, 0, Math.PI * 2);
-    freeCtx.fill();
-  });
-  
-  if (freeEnemies.length > 0 || freeBullets.length > 0) {
-    freeAnimFrame = requestAnimationFrame(freeLoop);
-  } else {
-    freeCanvas.style.display = 'none';
-    freeCanvasStarted = false;
-  }
-}
-
-function gameLoop(now) {
-  const dt = Math.min(now - lastTime, 50);
-  lastTime = now;
-  
-  if (screenShake > 0) {
-    shakeX = (Math.random() - 0.5) * screenShake;
-    shakeY = (Math.random() - 0.5) * screenShake;
-    screenShake *= 0.9;
-    if (screenShake < 0.5) screenShake = 0;
-  } else {
-    shakeX = 0;
-    shakeY = 0;
-  }
-  
-  ctx.save();
-  ctx.translate(shakeX, shakeY);
-  
-  ctx.fillStyle = '#000';
-  ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
-  
-  stars.forEach(s => {
-    s.y += s.sp;
-    if (s.y > canvasH) { s.y = 0; s.x = Math.random() * canvasW; }
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(s.x, s.y, s.s, s.s);
-  });
-  
-  if (torpedoMode) {
-    torpedoTimer -= dt;
-    if (torpedoTimer <= 0) {
-      torpedoMode = false;
-      torpedoCooldown = 30000;
-    }
-  }
-  if (torpedoCooldown > 0) torpedoCooldown -= dt;
-  if (player.shootCooldown > 0) player.shootCooldown -= dt;
-  
-  enemySpawnTimer -= dt;
-  if (enemySpawnTimer <= 0 && !gameOver) {
-    spawnEnemy();
-    enemySpawnTimer = 1500 + Math.random() * 1000;
-  }
-  
-  enemies.forEach(e => {
-    const dx = player.x - e.x;
-    const dy = player.y - e.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist < 60) {
-      e.fleeing = true;
-      const angle = Math.atan2(dy, dx) + Math.PI;
-      e.x += Math.cos(angle) * 2;
-      e.y += Math.sin(angle) * 2;
-    } else if (!e.fleeing) {
-      if (dist > 0) {
-        e.x += (dx / dist) * e.vy;
-        e.y += (dy / dist) * e.vy;
-      }
-    } else {
-      const angle = Math.atan2(dy, dx) + Math.PI;
-      e.x += Math.cos(angle) * 2;
-      e.y += Math.sin(angle) * 2;
-    }
-    
-    e.shootTimer -= dt;
-    if (e.shootTimer <= 0 && !gameOver && dist >= 60) {
-      enemyShoot(e);
-      e.shootTimer = 800 + Math.random() * 700;
-    }
-  });
-  
-  bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
-  bullets = bullets.filter(b => b.y > -10 && b.y < canvasH + 10);
-  
-  enemyBullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
-  enemyBullets = enemyBullets.filter(b => b.y > -10 && b.y < canvasH + 10);
-  
-  bullets.forEach(b => {
-    enemies.forEach(e => {
-      if (Math.abs(b.x - e.x) < e.w/2 + b.size && Math.abs(b.y - e.y) < e.h/2 + b.size) {
-        e.hp -= b.dmg;
-        b.y = -100;
-        explode(b.x, b.y, '#ff0');
-        if (e.hp <= 0) {
-          score += 10;
-          explode(e.x, e.y, '#f80', true);
-          e.y = canvasH + 200;
-        }
-      }
-    });
-  });
-  
-  const escaped = enemies.filter(e => e.y > canvasH + 30 && e.hp > 0);
-  escaped.forEach(e => {
-    if (freeEnemies.length < 6) {
-      const rect = gameCanvas.getBoundingClientRect();
-      freeEnemies.push({
-        x: rect.left + e.x,
-        y: rect.top + e.y,
-        vx: (Math.random() - 0.5) * 6,
-        vy: 3 + Math.random() * 3,
-        rotation: Math.PI,
-        rotSpeed: (Math.random() - 0.5) * 0.05,
-        shootTimer: 500 + Math.random() * 1000,
-        life: 300
-      });
-    }
-  });
-  enemies = enemies.filter(e => e.y < canvasH + 50 && e.hp > 0);
-  
-  if (freeEnemies.length > 0 && !freeCanvasStarted) {
-    freeCanvasStarted = true;
-    initFreeCanvas();
-    freeCanvas.style.display = 'block';
-    freeAnimFrame = requestAnimationFrame(freeLoop);
-  }
-  
-  if (!gameOver) {
-    enemyBullets.forEach(b => {
-      if (Math.abs(b.x - player.x) < player.w/2 + b.size && Math.abs(b.y - player.y) < player.h/2 + b.size) {
-        player.hp -= 1;
-        b.y = canvasH + 100;
-        explode(b.x, b.y, '#f00');
-        if (player.hp <= 0) {
-          gameOver = true;
-          explode(player.x, player.y, '#0af', true);
-        }
-      }
-    });
-  }
-  
-  bullets.forEach(b => {
-    enemyBullets.forEach(eb => {
-      if (Math.abs(b.x - eb.x) < b.size + eb.size && Math.abs(b.y - eb.y) < b.size + eb.size) {
-        b.y = -100;
-        eb.y = canvasH + 100;
-        explode((b.x + eb.x)/2, (b.y + eb.y)/2, '#fff');
-      }
-    });
-  });
-  
-  particles.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.life--;
-    p.vx *= 0.95;
-    p.vy *= 0.95;
-  });
-  particles = particles.filter(p => p.life > 0);
-  
-  particles.forEach(p => {
-    ctx.globalAlpha = p.life / 50;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
-  });
-  ctx.globalAlpha = 1;
-  
-  bullets.forEach(b => {
-    if (b.type === 'torpedo') {
-      ctx.fillStyle = '#f40';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,100,0,0.3)';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y + 8, b.size * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.fillStyle = '#ff0';
-      ctx.fillRect(b.x - 1, b.y - 4, 2, 8);
-    }
-  });
-  
-  enemyBullets.forEach(b => {
-    ctx.fillStyle = '#f00';
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  
-  enemies.forEach(e => {
-    drawShip(e.x, e.y, '#c33', false);
-    const barW = e.w + 4;
-    const barH = 4;
-    const barX = e.x - barW/2;
-    const barY = e.y + e.h/2 + 26;
-    ctx.fillStyle = '#333';
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = '#0f0';
-    ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
-  });
-  
-  if (!gameOver) {
-    drawShip(player.x, player.y, '#0af', true);
-    const barW = 40;
-    const barH = 5;
-    const barX = player.x - barW/2;
-    const barY = player.y + 38;
-    ctx.fillStyle = '#333';
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = player.hp > 3 ? '#0f0' : '#f00';
-    ctx.fillRect(barX, barY, barW * (player.hp / player.maxHp), barH);
-  }
-  
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('Счёт: ' + score, 10, 24);
-  
-  if (torpedoMode) {
-    ctx.fillStyle = '#f40';
-    ctx.textAlign = 'center';
-    ctx.fillText('🔥 ТОРПЕДЫ: ' + Math.ceil(torpedoTimer/1000) + 'с', canvasW/2, 24);
-  } else if (torpedoCooldown > 0) {
-    ctx.fillStyle = '#888';
-    ctx.textAlign = 'center';
-    ctx.fillText('Торпеды: ' + Math.ceil(torpedoCooldown/1000) + 'с', canvasW/2, 24);
-  }
-  
-  if (gameOver) {
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillRect(-10, -10, canvasW + 20, canvasH + 20);
-    ctx.fillStyle = '#f44';
-    ctx.font = 'bold 28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('GAME OVER', canvasW/2, canvasH/2 - 10);
-    ctx.fillStyle = '#fff';
-    ctx.font = '16px sans-serif';
-    ctx.fillText('Счёт: ' + score, canvasW/2, canvasH/2 + 20);
-  }
-  
-  ctx.restore();
-  
-  if (gameActive) {
-    animFrame = requestAnimationFrame(gameLoop);
-  }
-}
-
-let touchStartX = 0, touchStartY = 0, touchStartTime = 0, isDragging = false;
-
-gameCanvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  const t = e.touches[0];
-  const rect = gameCanvas.getBoundingClientRect();
-  touchStartX = t.clientX - rect.left;
-  touchStartY = t.clientY - rect.top;
-  touchStartTime = Date.now();
-  isDragging = false;
-}, { passive: false });
-
-gameCanvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (!gameActive || gameOver) return;
-  const t = e.touches[0];
-  const rect = gameCanvas.getBoundingClientRect();
-  const x = t.clientX - rect.left;
-  const y = t.clientY - rect.top;
-  const dx = x - touchStartX;
-  const dy = y - touchStartY;
-  if (Math.abs(dx) > 10 || Math.abs(dy) > 10) isDragging = true;
-  if (isDragging) {
-    player.x = Math.max(15, Math.min(canvasW - 15, x));
-  }
-}, { passive: false });
-
-gameCanvas.addEventListener('touchend', e => {
-  e.preventDefault();
-  const dt = Date.now() - touchStartTime;
-  if (!isDragging && dt < 300 && gameActive && !gameOver) {
-    shoot();
-  }
-}, { passive: false });
-
-let clickCount = 0;
-let clickTimer = null;
-scooterTitle.addEventListener('click', () => {
-  if (gameActive) return;
-  clickCount++;
-  clearTimeout(clickTimer);
-  clickTimer = setTimeout(() => { clickCount = 0; }, 2000);
-  if (clickCount >= 4) {
-    startGame();
-    clickCount = 0;
-  }
-});
-
-sendBtn.addEventListener('click', async () => {
-  status.className = '';
-  if (!currentFile) { 
-    status.textContent = 'Сначала сделайте фото'; 
-    status.className='err'; 
-    return; 
-  }
-  if (!streetIn.value.trim()) { 
-    status.textContent = 'Укажите улицу'; 
-    status.className='err'; 
-    return; 
-  }
-
-  sendBtn.disabled = true;
-  status.textContent = 'Отправляем...';
-
-  try {
-    const fd = new FormData();
-    fd.append('chat_id', CHAT_ID);
-    fd.append('photo', currentFile);
-    
-    // Формируем красивую подпись в ОДНОМ сообщении
-    const captionText = `🛴 *Новая находка!*\n📍 Улица: ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`;
-    
-    fd.append('caption', captionText);
-    fd.append('parse_mode', 'Markdown'); // Делает текст жирным
-
-    // Отправляем ТОЛЬКО фото с подписью (убрали лишний запрос sendMessage)
-    const r1 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-      method: 'POST', 
-      body: fd
-    });
-    
-    const j1 = await r1.json();
-    if (!j1.ok) throw new Error(j1.description || 'Ошибка отправки фото');
-
-    status.textContent = 'Отправлено! Спасибо';
-    status.className = 'ok';
-    clearPreview();
-    streetIn.value = '';
-  } catch (err) {
-    status.textContent = 'Ошибка: ' + err.message;
-    status.className = 'err';
-  } finally {
-    sendBtn.disabled = false;
-  }
-});
 
 function showPreview(file) {
   currentFile = file;
@@ -1181,23 +431,69 @@ function clearPreview() {
   cameraIn.value = '';
   fileIn.value = '';
   status.textContent = '';
-  if (!gameActive) photoCard.style.display = 'none';
+  photoCard.style.display = 'none';
 }
 
 cameraBtn.addEventListener('click', () => { cameraIn.click(); });
 galleryBtn.addEventListener('click', () => { fileIn.click(); });
-cameraIn.addEventListener('change', e => { if (e.target.files[0]) showPreview(e.target.files[0]); });
-fileIn.addEventListener('change', e => { if (e.target.files[0]) showPreview(e.target.files[0]); });
-retakeBtn.addEventListener('click', () => {
-  if (gameActive) {
-    restartGame();
-  } else {
+
+cameraIn.addEventListener('change', e => { 
+  if (e.target.files[0]) showPreview(e.target.files[0]); 
+});
+
+fileIn.addEventListener('change', e => { 
+  if (e.target.files[0]) showPreview(e.target.files[0]); 
+});
+
+retakeBtn.addEventListener('click', clearPreview);
+
+sendBtn.addEventListener('click', async () => {
+  status.className = '';
+  if (!currentFile) { 
+    status.textContent = 'Сначала сделайте фото'; 
+    status.className = 'err'; 
+    return; 
+  }
+  if (!streetIn.value.trim()) { 
+    status.textContent = 'Укажите улицу'; 
+    status.className = 'err'; 
+    return; 
+  }
+
+  sendBtn.disabled = true;
+  status.textContent = 'Отправляем...';
+
+  try {
+    const fd = new FormData();
+    fd.append('chat_id', CHAT_ID);
+    fd.append('photo', currentFile);
+    
+    const captionText = `🛴 *Новая находка!*\n📍 Улица: ${streetIn.value.trim()}\n🕒 ${new Date().toLocaleString('ru-RU')}`;
+    
+    fd.append('caption', captionText);
+    fd.append('parse_mode', 'Markdown');
+
+    const r1 = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: 'POST', 
+      body: fd
+    });
+    
+    const j1 = await r1.json();
+    if (!j1.ok) throw new Error(j1.description || 'Ошибка отправки фото');
+
+    status.textContent = 'Отправлено! Спасибо';
+    status.className = 'ok';
     clearPreview();
+    streetIn.value = '';
+  } catch (err) {
+    status.textContent = 'Ошибка: ' + err.message;
+    status.className = 'err';
+  } finally {
+    sendBtn.disabled = false;
   }
 });
 
 logoutBtn.addEventListener('click', () => {
-  if (gameActive) endGame();
   if (navigator.app) {
     navigator.app.exitApp();
   } else {
